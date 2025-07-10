@@ -3,42 +3,126 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>MediaPipe Wrist Tracking Test</title>
+    <title>MediaPipe 3D Human Movement Analysis</title>
     <link rel="stylesheet" href="style.css">
 </head>
 <body>
     <div class="container">
-        <video id="video" playsinline></video>
-        <canvas id="canvas"></canvas>
-        
-        <div class="controls">
-            <button id="startBtn" class="btn">Start Camera</button>
-            <button id="stopBtn" class="btn" style="display: none;">Stop Camera</button>
+        <div class="header">
+            <h1>3D Movement Analysis</h1>
+            <div class="mode-selector">
+                <button id="poseMode" class="mode-btn active">Pose Tracking</button>
+                <button id="handMode" class="mode-btn">Hand Tracking</button>
+                <button id="combinedMode" class="mode-btn">Combined</button>
+            </div>
+        </div>
+
+        <div class="video-container">
+            <video id="video" playsinline></video>
+            <canvas id="canvas"></canvas>
+            <div class="overlay-info">
+                <div class="fps-display">FPS: <span id="fps">0</span></div>
+            </div>
         </div>
         
-        <div class="info-panel">
-            <div class="info-item">
-                <span class="label">FPS:</span>
-                <span id="fps">0</span>
+        <div class="controls">
+            <button id="startBtn" class="btn primary">Start Camera</button>
+            <button id="stopBtn" class="btn secondary" style="display: none;">Stop Camera</button>
+            <button id="recordBtn" class="btn record" style="display: none;">Record Data</button>
+            <button id="resetBtn" class="btn reset">Reset</button>
+        </div>
+        
+        <div class="analysis-panel">
+            <div class="panel-section">
+                <h3>Pose Analysis</h3>
+                <div class="metrics-grid">
+                    <div class="metric-item">
+                        <span class="label">Left Wrist Position:</span>
+                        <span id="leftWristPos" class="value">-</span>
+                    </div>
+                    <div class="metric-item">
+                        <span class="label">Right Wrist Position:</span>
+                        <span id="rightWristPos" class="value">-</span>
+                    </div>
+                    <div class="metric-item">
+                        <span class="label">Left Wrist Velocity:</span>
+                        <span id="leftWristVel" class="value">-</span>
+                    </div>
+                    <div class="metric-item">
+                        <span class="label">Right Wrist Velocity:</span>
+                        <span id="rightWristVel" class="value">-</span>
+                    </div>
+                    <div class="metric-item">
+                        <span class="label">Angular Velocity:</span>
+                        <span id="angularVel" class="value">-</span>
+                    </div>
+                </div>
             </div>
-            <div class="info-item">
-                <span class="label">Left Wrist:</span>
-                <span id="leftWrist">-</span>
+
+            <div class="panel-section">
+                <h3>Hand Analysis</h3>
+                <div class="metrics-grid">
+                    <div class="metric-item">
+                        <span class="label">Left Index Finger:</span>
+                        <span id="leftIndexPos" class="value">-</span>
+                    </div>
+                    <div class="metric-item">
+                        <span class="label">Right Index Finger:</span>
+                        <span id="rightIndexPos" class="value">-</span>
+                    </div>
+                    <div class="metric-item">
+                        <span class="label">Left Finger Velocity:</span>
+                        <span id="leftFingerVel" class="value">-</span>
+                    </div>
+                    <div class="metric-item">
+                        <span class="label">Right Finger Velocity:</span>
+                        <span id="rightFingerVel" class="value">-</span>
+                    </div>
+                    <div class="metric-item">
+                        <span class="label">Wrist-Finger Distance:</span>
+                        <span id="wristFingerDist" class="value">-</span>
+                    </div>
+                </div>
             </div>
-            <div class="info-item">
-                <span class="label">Right Wrist:</span>
-                <span id="rightWrist">-</span>
+
+            <div class="panel-section">
+                <h3>3D Movement Data</h3>
+                <div class="metrics-grid">
+                    <div class="metric-item">
+                        <span class="label">Overall Movement:</span>
+                        <span id="overallMovement" class="value">-</span>
+                    </div>
+                    <div class="metric-item">
+                        <span class="label">Depth (Z) Movement:</span>
+                        <span id="depthMovement" class="value">-</span>
+                    </div>
+                    <div class="metric-item">
+                        <span class="label">Max Velocity Recorded:</span>
+                        <span id="maxVelocity" class="value">-</span>
+                    </div>
+                    <div class="metric-item">
+                        <span class="label">Movement Pattern:</span>
+                        <span id="movementPattern" class="value">-</span>
+                    </div>
+                </div>
             </div>
-            <div class="info-item">
-                <span class="label">Angular Speed:</span>
-                <span id="wristSpeed">-</span>
-            </div>
+        </div>
+
+        <div class="charts-container" id="chartsContainer" style="display: none;">
+            <canvas id="velocityChart" width="400" height="200"></canvas>
         </div>
     </div>
 
+    <!-- MediaPipe Scripts -->
     <script src="https://cdn.jsdelivr.net/npm/@mediapipe/pose/pose.js" crossorigin="anonymous"></script>
+    <script src="https://cdn.jsdelivr.net/npm/@mediapipe/hands/hands.js" crossorigin="anonymous"></script>
     <script src="https://cdn.jsdelivr.net/npm/@mediapipe/camera_utils/camera_utils.js" crossorigin="anonymous"></script>
     <script src="https://cdn.jsdelivr.net/npm/@mediapipe/drawing_utils/drawing_utils.js" crossorigin="anonymous"></script>
+    <script src="https://cdn.jsdelivr.net/npm/@mediapipe/holistic/holistic.js" crossorigin="anonymous"></script>
+    
+    <!-- Chart.js for data visualization -->
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    
     <script src="app.js"></script>
 </body>
 </html>
