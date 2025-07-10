@@ -21,6 +21,16 @@ const wristHistory = {
 };
 const MAX_HISTORY = 20;
 
+// Store angle history for angular velocity calculation
+const angleHistory = {
+    left: [],
+    right: []
+};
+
+// Shot detection state
+let shotDetected = false;
+let shotCooldown = 0;
+
 // Initialize MediaPipe Pose
 const pose = new Pose({
     locateFile: (file) => {
@@ -68,9 +78,16 @@ function onResults(results) {
             radius: 3
         });
 
-        // Get wrist positions (indices: 15 = left wrist, 16 = right wrist)
+        // Get landmarks for shot detection
+        // Wrists: 15 = left, 16 = right
+        // Index fingers: 19 = left, 20 = right  
+        // Shoulders: 11 = left, 12 = right
         const leftWrist = results.poseLandmarks[15];
         const rightWrist = results.poseLandmarks[16];
+        const leftIndex = results.poseLandmarks[19];
+        const rightIndex = results.poseLandmarks[20];
+        const leftShoulder = results.poseLandmarks[11];
+        const rightShoulder = results.poseLandmarks[12];
 
         // Update wrist position display
         leftWristElement.textContent = `x: ${leftWrist.x.toFixed(3)}, y: ${leftWrist.y.toFixed(3)}, z: ${leftWrist.z.toFixed(3)}`;
@@ -104,6 +121,9 @@ function onResults(results) {
 
         // Calculate and display wrist speed
         calculateWristSpeed();
+        
+        // Check for basketball shot
+        checkBasketballShot(results.poseLandmarks, currentTime);
     }
 
     canvasCtx.restore();
@@ -189,6 +209,101 @@ function calculateWristSpeed() {
     if (count > 0) {
         const avgSpeed = totalSpeed / count;
         wristSpeedElement.textContent = `${avgSpeed.toFixed(0)} px/s`;
+    }
+}
+
+function checkBasketballShot(landmarks, currentTime) {
+    // Decrease cooldown
+    if (shotCooldown > 0) {
+        shotCooldown--;
+        return;
+    }
+    
+    // Check both hands
+    const hands = [
+        { wrist: landmarks[15], index: landmarks[19], shoulder: landmarks[11], side: 'left' },
+        { wrist: landmarks[16], index: landmarks[20], shoulder: landmarks[12], side: 'right' }
+    ];
+    
+    for (const hand of hands) {
+        // Check if wrist is above shoulder (y coordinates are inverted in normalized space)
+        const wristAboveShoulder = hand.wrist.y < hand.shoulder.y;
+        
+        if (wristAboveShoulder) {
+            // Calculate angle between wrist-index vector and horizontal
+            const dx = hand.index.x - hand.wrist.x;
+            const dy = hand.index.y - hand.wrist.y;
+            const angle = Math.atan2(dy, dx) * 180 / Math.PI;
+            
+            // Add to angle history
+            angleHistory[hand.side].push({ angle, time: currentTime });
+            
+            // Keep history limited
+            if (angleHistory[hand.side].length > 10) {
+                angleHistory[hand.side].shift();
+            }
+            
+            // Calculate angular velocity if we have enough history
+            if (angleHistory[hand.side].length >= 3) {
+                const recent = angleHistory[hand.side][angleHistory[hand.side].length - 1];
+                const previous = angleHistory[hand.side][angleHistory[hand.side].length - 3];
+                
+                const angleDiff = recent.angle - previous.angle;
+                const timeDiff = (recent.time - previous.time) / 1000; // seconds
+                const angularVelocity = Math.abs(angleDiff / timeDiff);
+                
+                // Update display with angular velocity
+                const speedElement = document.getElementById('wristSpeed');
+                speedElement.textContent = `${angularVelocity.toFixed(0)}°/s`;
+                
+                // Check for shooting motion
+                // Looking for downward flick (positive angle change) with high velocity
+                if (angularVelocity > 300 && angleDiff > 0) {
+                    // Additional check: ensure the motion is forward (towards palm side)
+                    // In a shooting motion, the angle typically goes from negative to positive
+                    if (previous.angle < 0 && recent.angle > previous.angle) {
+                        triggerShotDetection();
+                    }
+                }
+            }
+        } else {
+            // Clear angle history when wrist is below shoulder
+            angleHistory[hand.side] = [];
+        }
+    }
+}
+
+function triggerShotDetection() {
+    if (!shotDetected) {
+        shotDetected = true;
+        shotCooldown = 30; // Prevent multiple detections for 30 frames
+        
+        // Visual feedback
+        const canvas = document.getElementById('canvas');
+        canvas.style.border = '5px solid #00FF00';
+        
+        // Text alert
+        const alertDiv = document.createElement('div');
+        alertDiv.textContent = 'Basketball Shot Detected!';
+        alertDiv.style.position = 'absolute';
+        alertDiv.style.top = '50%';
+        alertDiv.style.left = '50%';
+        alertDiv.style.transform = 'translate(-50%, -50%)';
+        alertDiv.style.fontSize = '32px';
+        alertDiv.style.color = '#00FF00';
+        alertDiv.style.fontWeight = 'bold';
+        alertDiv.style.textShadow = '2px 2px 4px rgba(0,0,0,0.8)';
+        alertDiv.style.pointerEvents = 'none';
+        alertDiv.style.zIndex = '100';
+        
+        document.querySelector('.container').appendChild(alertDiv);
+        
+        // Remove visual feedback after 1 second
+        setTimeout(() => {
+            canvas.style.border = 'none';
+            alertDiv.remove();
+            shotDetected = false;
+        }, 1000);
     }
 }
 
