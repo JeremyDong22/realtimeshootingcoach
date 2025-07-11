@@ -13,6 +13,7 @@ const wristSpeedElement = document.getElementById('wristSpeed');
 // Debug elements
 const poseDetectedElement = document.getElementById('poseDetected');
 const faceAngleElement = document.getElementById('faceAngle');
+const rightShoulderForwardElement = document.getElementById('rightShoulderForward');
 const shootingSideOkElement = document.getElementById('shootingSideOk');
 const past90DegreesElement = document.getElementById('past90Degrees');
 const wristAboveShoulderElement = document.getElementById('wristAboveShoulder');
@@ -45,23 +46,40 @@ let shotCooldown = 0;
 const SHOOTING_HAND = 'right';
 const VELOCITY_THRESHOLD = 300; // degrees per second
 
-// Initialize MediaPipe Pose
-const pose = new Pose({
+// Initialize MediaPipe Holistic
+const holistic = new Holistic({
     locateFile: (file) => {
-        return `https://cdn.jsdelivr.net/npm/@mediapipe/pose/${file}`;
+        return `https://cdn.jsdelivr.net/npm/@mediapipe/holistic/${file}`;
     }
 });
 
-pose.setOptions({
+holistic.setOptions({
     modelComplexity: 1,
     smoothLandmarks: true,
     enableSegmentation: false,
     smoothSegmentation: false,
+    refineFaceLandmarks: true,
     minDetectionConfidence: 0.5,
     minTrackingConfidence: 0.5
 });
 
-pose.onResults(onResults);
+holistic.onResults(onResults);
+
+// Helper function to calculate angle between three points
+function calculateAngle(a, b, c) {
+    // Calculate vectors BA and BC
+    const ba = { x: a.x - b.x, y: a.y - b.y };
+    const bc = { x: c.x - b.x, y: c.y - b.y };
+    
+    // Calculate dot product and magnitudes
+    const dotProduct = ba.x * bc.x + ba.y * bc.y;
+    const magnitudeBA = Math.sqrt(ba.x * ba.x + ba.y * ba.y);
+    const magnitudeBC = Math.sqrt(bc.x * bc.x + bc.y * bc.y);
+    
+    // Calculate angle in radians and convert to degrees
+    const angleRad = Math.acos(dotProduct / (magnitudeBA * magnitudeBC));
+    return angleRad * 180 / Math.PI;
+}
 
 function updateDebugInfo(state) {
     // Update debug panel
@@ -69,6 +87,9 @@ function updateDebugInfo(state) {
     poseDetectedElement.className = state.poseDetected ? 'active' : '';
     
     faceAngleElement.textContent = state.faceAngle !== null ? `${state.faceAngle.toFixed(1)}°` : '-';
+    
+    rightShoulderForwardElement.textContent = state.rightShoulderForward ? 'Yes' : 'No';
+    rightShoulderForwardElement.className = state.rightShoulderForward ? 'active' : '';
     
     shootingSideOkElement.textContent = state.shootingSideOk ? 'Yes' : 'No';
     shootingSideOkElement.className = state.shootingSideOk ? 'active' : '';
@@ -96,6 +117,7 @@ function onResults(results) {
     const debugState = {
         poseDetected: false,
         faceAngle: null,
+        rightShoulderForward: false,
         shootingSideOk: false,
         past90Degrees: false,
         wristAboveShoulder: false,
@@ -111,7 +133,7 @@ function onResults(results) {
     // Draw the video
     canvasCtx.drawImage(results.image, 0, 0, canvasElement.width, canvasElement.height);
 
-    if (results.poseLandmarks) {
+    if (results.poseLandmarks && results.faceLandmarks) {
         debugState.poseDetected = true;
         
         // Draw pose skeleton
@@ -126,14 +148,17 @@ function onResults(results) {
             lineWidth: 1,
             radius: 3
         });
+        
+        // Draw face landmarks (optional, for debugging)
+        drawLandmarks(canvasCtx, results.faceLandmarks, {
+            color: '#C0C0C0',
+            lineWidth: 1,
+            radius: 1
+        });
 
-        // Get landmarks
-        // Face: nose=0, left ear=7, right ear=8
+        // Get pose landmarks
         // Right side: wrist=16, pinky=18, shoulder=12, elbow=14
         // Left side: wrist=15, pinky=17, shoulder=11, elbow=13
-        const nose = results.poseLandmarks[0];
-        const leftEar = results.poseLandmarks[7];
-        const rightEar = results.poseLandmarks[8];
         
         const rightWrist = results.poseLandmarks[16];
         const rightPinky = results.poseLandmarks[18];
@@ -142,6 +167,13 @@ function onResults(results) {
         
         const leftWrist = results.poseLandmarks[15];
         const leftShoulder = results.poseLandmarks[11];
+        
+        // Get face landmarks
+        // Inner eye corners (tear ducts): left=133, right=362
+        // Nose tip=1
+        const leftInnerEye = results.faceLandmarks[133];
+        const rightInnerEye = results.faceLandmarks[362];
+        const noseTip = results.faceLandmarks[1];
 
         // Update wrist position display
         leftWristElement.textContent = `x: ${leftWrist.x.toFixed(3)}, y: ${leftWrist.y.toFixed(3)}, z: ${leftWrist.z.toFixed(3)}`;
@@ -184,20 +216,23 @@ function onResults(results) {
         const wristAboveShoulder = rightWrist.y < rightShoulder.y;
         debugState.wristAboveShoulder = wristAboveShoulder;
 
-        // Check face orientation
-        // Calculate face angle using ear positions
-        const earDx = rightEar.x - leftEar.x;
-        const earDz = rightEar.z - leftEar.z;
-        const faceAngle = Math.atan2(earDx, earDz) * 180 / Math.PI;
+        // Check face orientation using inner eye corners and nose
+        // Calculate angle at the nose between the two inner eye corners
+        const noseAngle = calculateAngle(leftInnerEye, noseTip, rightInnerEye);
         
-        // When facing right, left ear is behind right ear (negative angle)
-        // Accept left-facing angles (which means right side is visible to camera)
-        const shootingFromRightSide = faceAngle <= -20 || faceAngle >= 160;
+        // Check shoulder depth - right shoulder should be in front
+        const rightShoulderForward = rightShoulder.z < leftShoulder.z;
+        
+        // Facing left (right side visible) when:
+        // 1. Nose angle is small (< 20°) indicating side view
+        // 2. Right shoulder is forward (smaller Z value)
+        const shootingFromRightSide = noseAngle <= 20 && rightShoulderForward;
         debugState.shootingSideOk = shootingFromRightSide;
         
-        // Update debug state with face angle
-        debugState.faceAngle = faceAngle;
-        console.log(`Face angle: ${faceAngle.toFixed(1)}°`);
+        // Update debug state with face angle and shoulder status
+        debugState.faceAngle = noseAngle;
+        debugState.rightShoulderForward = rightShoulderForward;
+        console.log(`Nose angle: ${noseAngle.toFixed(1)}°, Right shoulder forward: ${rightShoulderForward}`);
 
         if (wristAboveShoulder) {
             // Calculate angle between wrist-pinky vector
@@ -373,7 +408,7 @@ startBtn.addEventListener('click', async () => {
 
     camera = new Camera(videoElement, {
         onFrame: async () => {
-            await pose.send({ image: videoElement });
+            await holistic.send({ image: videoElement });
         },
         width: 1280,
         height: 720
@@ -385,8 +420,8 @@ startBtn.addEventListener('click', async () => {
     canvasElement.width = videoElement.videoWidth || 1280;
     canvasElement.height = videoElement.videoHeight || 720;
     
-    console.log('MediaPipe Pose initialized - tracking with pinky finger');
-    console.log('Detection requires: 1) Right side view, 2) Wrist above shoulder, 3) Angle > 90°, 4) Velocity > 300°/s');
+    console.log('MediaPipe Holistic initialized - tracking with face landmarks and pose');
+    console.log('Detection requires: 1) Face angle < 20°, 2) Right shoulder forward, 3) Wrist above shoulder, 4) Angle > 90°, 5) Velocity > 300°/s');
 });
 
 stopBtn.addEventListener('click', () => {
@@ -410,6 +445,7 @@ stopBtn.addEventListener('click', () => {
     updateDebugInfo({
         poseDetected: false,
         faceAngle: null,
+        rightShoulderForward: false,
         shootingSideOk: false,
         past90Degrees: false,
         wristAboveShoulder: false,
