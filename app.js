@@ -222,9 +222,12 @@ function onResults(results) {
                 const isForwardMotion = angleDiff > 0 && recent.angle > -90 && previous.angle < -90;
                 
                 // Check all conditions for shot detection
+                // Ensure the recent angle (where we ended up) is in the valid shooting range
+                const recentAngleInRange = recent.angle > -90 && recent.angle < 0;
+                
                 if (shotCooldown === 0 &&
                     wristAboveShoulder &&
-                    debugState.past90Degrees &&
+                    recentAngleInRange &&
                     isForwardMotion &&
                     angularVelocity > VELOCITY_THRESHOLD) {
                     
