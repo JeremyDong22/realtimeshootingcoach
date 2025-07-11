@@ -224,6 +224,7 @@ function onResults(results) {
                 // Check all conditions for shot detection
                 if (shotCooldown === 0 &&
                     wristAboveShoulder &&
+                    debugState.past90Degrees &&
                     isForwardMotion &&
                     angularVelocity > VELOCITY_THRESHOLD) {
                     
