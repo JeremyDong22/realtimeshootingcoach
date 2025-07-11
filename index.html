@@ -34,9 +34,42 @@
                 <span id="wristSpeed">-</span>
             </div>
         </div>
+        
+        <!-- Debug Panel -->
+        <div class="debug-panel" id="debugPanel">
+            <h3>Debug Info</h3>
+            <div class="debug-item">
+                <span class="label">Pose Detected:</span>
+                <span id="poseDetected">No</span>
+            </div>
+            <div class="debug-item">
+                <span class="label">Hand Active:</span>
+                <span id="handActive">No</span>
+            </div>
+            <div class="debug-item">
+                <span class="label">Hand Landmarks:</span>
+                <span id="handLandmarks">0</span>
+            </div>
+            <div class="debug-item">
+                <span class="label">Wrist Above Shoulder:</span>
+                <span id="wristAboveShoulder">No</span>
+            </div>
+            <div class="debug-item">
+                <span class="label">Current Angle:</span>
+                <span id="currentAngle">-</span>
+            </div>
+            <div class="debug-item">
+                <span class="label">Angle Velocity:</span>
+                <span id="angleVelocity">-</span>
+            </div>
+            <div class="debug-item">
+                <span class="label">Detection State:</span>
+                <span id="detectionState">Idle</span>
+            </div>
+        </div>
     </div>
 
-    <script src="https://cdn.jsdelivr.net/npm/@mediapipe/pose/pose.js" crossorigin="anonymous"></script>
+    <script src="https://cdn.jsdelivr.net/npm/@mediapipe/holistic/holistic.js" crossorigin="anonymous"></script>
     <script src="https://cdn.jsdelivr.net/npm/@mediapipe/camera_utils/camera_utils.js" crossorigin="anonymous"></script>
     <script src="https://cdn.jsdelivr.net/npm/@mediapipe/drawing_utils/drawing_utils.js" crossorigin="anonymous"></script>
     <script src="app.js"></script>
