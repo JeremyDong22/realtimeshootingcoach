@@ -12,6 +12,7 @@ const wristSpeedElement = document.getElementById('wristSpeed');
 
 // Debug elements
 const poseDetectedElement = document.getElementById('poseDetected');
+const faceAngleElement = document.getElementById('faceAngle');
 const shootingSideOkElement = document.getElementById('shootingSideOk');
 const past90DegreesElement = document.getElementById('past90Degrees');
 const wristAboveShoulderElement = document.getElementById('wristAboveShoulder');
@@ -67,6 +68,8 @@ function updateDebugInfo(state) {
     poseDetectedElement.textContent = state.poseDetected ? 'Yes' : 'No';
     poseDetectedElement.className = state.poseDetected ? 'active' : '';
     
+    faceAngleElement.textContent = state.faceAngle !== null ? `${state.faceAngle.toFixed(1)}°` : '-';
+    
     shootingSideOkElement.textContent = state.shootingSideOk ? 'Yes' : 'No';
     shootingSideOkElement.className = state.shootingSideOk ? 'active' : '';
     
@@ -76,7 +79,7 @@ function updateDebugInfo(state) {
     wristAboveShoulderElement.textContent = state.wristAboveShoulder ? 'Yes' : 'No';
     wristAboveShoulderElement.className = state.wristAboveShoulder ? 'active' : '';
     
-    currentAngleElement.textContent = state.currentAngle ? `${state.currentAngle.toFixed(1)}°` : '-';
+    currentAngleElement.textContent = state.currentAngle !== null ? `${state.currentAngle.toFixed(1)}°` : '-';
     angleVelocityElement.textContent = state.angleVelocity ? `${state.angleVelocity.toFixed(0)}°/s` : '-';
     detectionStateElement.textContent = state.detectionState || 'Idle';
 }
@@ -92,6 +95,7 @@ function onResults(results) {
     // Debug state
     const debugState = {
         poseDetected: false,
+        faceAngle: null,
         shootingSideOk: false,
         past90Degrees: false,
         wristAboveShoulder: false,
@@ -124,8 +128,13 @@ function onResults(results) {
         });
 
         // Get landmarks
+        // Face: nose=0, left ear=7, right ear=8
         // Right side: wrist=16, pinky=18, shoulder=12, elbow=14
         // Left side: wrist=15, pinky=17, shoulder=11, elbow=13
+        const nose = results.poseLandmarks[0];
+        const leftEar = results.poseLandmarks[7];
+        const rightEar = results.poseLandmarks[8];
+        
         const rightWrist = results.poseLandmarks[16];
         const rightPinky = results.poseLandmarks[18];
         const rightShoulder = results.poseLandmarks[12];
@@ -175,27 +184,36 @@ function onResults(results) {
         const wristAboveShoulder = rightWrist.y < rightShoulder.y;
         debugState.wristAboveShoulder = wristAboveShoulder;
 
-        // Check if shooting from the right side
-        // If elbow is to the right of shoulder, person is facing/shooting from right
-        const shootingFromRightSide = rightElbow.x > rightShoulder.x;
+        // Check face orientation
+        // Calculate face angle using ear positions
+        const earDx = rightEar.x - leftEar.x;
+        const earDz = rightEar.z - leftEar.z;
+        const faceAngle = Math.atan2(earDx, earDz) * 180 / Math.PI;
+        
+        // Accept right-facing angles from -30° to +20°
+        const shootingFromRightSide = faceAngle >= -30 && faceAngle <= 20;
         debugState.shootingSideOk = shootingFromRightSide;
+        
+        // Update debug state with face angle
+        debugState.faceAngle = faceAngle;
+        console.log(`Face angle: ${faceAngle.toFixed(1)}°`);
 
         if (wristAboveShoulder) {
-            // Calculate angle between wrist-pinky vector and vertical
+            // Calculate angle between wrist-pinky vector
             const dx = rightPinky.x - rightWrist.x;
             const dy = rightPinky.y - rightWrist.y;
             
-            // Calculate angle from vertical (0° = up, 90° = horizontal)
-            // atan2 gives angle from horizontal, so we adjust
-            const angleFromHorizontal = Math.atan2(dy, dx) * 180 / Math.PI;
-            const angleFromVertical = Math.abs(angleFromHorizontal - 90);
+            // Calculate angle from horizontal
+            // For right hand: -90° = up, 0° = right, 90° = down, ±180° = left
+            const angle = Math.atan2(dy, dx) * 180 / Math.PI;
             
-            debugState.currentAngle = angleFromVertical;
-            debugState.past90Degrees = angleFromVertical > 90;
+            debugState.currentAngle = angle;
+            // For right hand, past 90° means angle > 90 (pointing downward)
+            debugState.past90Degrees = angle > 90;
             
             // Add to angle history
             angleHistory.right.push({ 
-                angle: angleFromVertical, 
+                angle: angle, 
                 time: currentTime,
                 dx: dx,
                 dy: dy
@@ -220,20 +238,24 @@ function onResults(results) {
                 // Update display with angular velocity
                 wristSpeedElement.textContent = `${angularVelocity.toFixed(0)}°/s`;
                 
+                // Check for forward shooting motion
+                // For right hand: angle should progress from negative (cocked back) to positive (forward)
+                // and pass through 90° (pointing down)
+                const isForwardMotion = angleDiff > 0 && recent.angle > 90 && previous.angle < 90;
+                
                 // Check all conditions for shot detection
                 if (shotCooldown === 0 &&
                     wristAboveShoulder &&
                     shootingFromRightSide &&
-                    angleFromVertical > 90 &&
-                    angularVelocity > VELOCITY_THRESHOLD &&
-                    angleDiff > 0) { // Positive angle change means moving downward
+                    isForwardMotion &&
+                    angularVelocity > VELOCITY_THRESHOLD) {
                     
-                    // Additional check: ensure wrist is flicking forward (dx should be positive for right hand)
-                    if (recent.dx > 0) {
-                        debugState.detectionState = 'Shot Detected!';
-                        console.log(`SHOT DETECTED! Velocity: ${angularVelocity.toFixed(0)}°/s, Angle: ${angleFromVertical.toFixed(1)}°`);
-                        triggerShotDetection();
-                    }
+                    debugState.detectionState = 'Shot Detected!';
+                    console.log(`SHOT DETECTED! Forward flick detected`);
+                    console.log(`  Angle: ${previous.angle.toFixed(1)}° → ${recent.angle.toFixed(1)}°`);
+                    console.log(`  Velocity: ${angularVelocity.toFixed(0)}°/s`);
+                    console.log(`  Face angle: ${faceAngle.toFixed(1)}°`);
+                    triggerShotDetection();
                 }
             }
         } else {
@@ -386,6 +408,7 @@ stopBtn.addEventListener('click', () => {
     // Reset debug info
     updateDebugInfo({
         poseDetected: false,
+        faceAngle: null,
         shootingSideOk: false,
         past90Degrees: false,
         wristAboveShoulder: false,
