@@ -224,9 +224,9 @@ function onResults(results) {
         const rightShoulderForward = rightShoulder.z < leftShoulder.z;
         
         // Facing left (right side visible) when:
-        // 1. Nose angle is small (< 20°) indicating side view
+        // 1. Nose angle is small (< 15° indicating side view)
         // 2. Right shoulder is forward (smaller Z value)
-        const shootingFromRightSide = noseAngle <= 20 && rightShoulderForward;
+        const shootingFromRightSide = noseAngle <= 15 && rightShoulderForward;
         debugState.shootingSideOk = shootingFromRightSide;
         
         // Update debug state with face angle and shoulder status
@@ -420,7 +420,7 @@ startBtn.addEventListener('click', async () => {
     canvasElement.height = videoElement.videoHeight || 720;
     
     console.log('MediaPipe Holistic initialized - tracking with index finger');
-    console.log('Detection requires: 1) Face angle < 20°, 2) Right shoulder forward, 3) Wrist above shoulder, 4) Angle < 90°, 5) Velocity > 300°/s');
+    console.log('Detection requires: 1) Face angle < 15°, 2) Right shoulder forward, 3) Wrist above shoulder, 4) Angle > -90°, 5) Velocity > 300°/s');
 });
 
 stopBtn.addEventListener('click', () => {
