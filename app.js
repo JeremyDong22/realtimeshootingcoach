@@ -157,11 +157,11 @@ function onResults(results) {
         });
 
         // Get pose landmarks
-        // Right side: wrist=16, pinky=18, shoulder=12, elbow=14
-        // Left side: wrist=15, pinky=17, shoulder=11, elbow=13
+        // Right side: wrist=16, index=20, shoulder=12, elbow=14
+        // Left side: wrist=15, index=19, shoulder=11, elbow=13
         
         const rightWrist = results.poseLandmarks[16];
-        const rightPinky = results.poseLandmarks[18];
+        const rightIndex = results.poseLandmarks[20];
         const rightShoulder = results.poseLandmarks[12];
         const rightElbow = results.poseLandmarks[14];
         
@@ -185,9 +185,9 @@ function onResults(results) {
             y: rightWrist.y * canvasElement.height
         };
         
-        const rightPinkyCanvas = {
-            x: rightPinky.x * canvasElement.width,
-            y: rightPinky.y * canvasElement.height
+        const rightIndexCanvas = {
+            x: rightIndex.x * canvasElement.width,
+            y: rightIndex.y * canvasElement.height
         };
 
         const leftWristCanvas = {
@@ -207,10 +207,10 @@ function onResults(results) {
         drawWristTrail(wristHistory.left, '#FF00FF');
         drawWristTrail(wristHistory.right, '#00FFFF');
 
-        // Highlight wrists and pinky
+        // Highlight wrists and index finger
         drawWrist(leftWristCanvas, '#FF00FF', 'L');
         drawWrist(rightWristCanvas, '#00FFFF', 'R');
-        drawWrist(rightPinkyCanvas, '#FFD700', 'P'); // Draw pinky in gold
+        drawWrist(rightIndexCanvas, '#FFD700', 'I'); // Draw index in gold
 
         // Check if right wrist is above shoulder
         const wristAboveShoulder = rightWrist.y < rightShoulder.y;
@@ -235,17 +235,17 @@ function onResults(results) {
         console.log(`Nose angle: ${noseAngle.toFixed(1)}°, Right shoulder forward: ${rightShoulderForward}`);
 
         if (wristAboveShoulder) {
-            // Calculate angle between wrist-pinky vector
-            const dx = rightPinky.x - rightWrist.x;
-            const dy = rightPinky.y - rightWrist.y;
+            // Calculate angle between wrist-index vector
+            const dx = rightIndex.x - rightWrist.x;
+            const dy = rightIndex.y - rightWrist.y;
             
             // Calculate angle from horizontal
             // For right hand: -90° = up, 0° = right, 90° = down, ±180° = left
             const angle = Math.atan2(dy, dx) * 180 / Math.PI;
             
             debugState.currentAngle = angle;
-            // For right hand, past 90° means angle > 90 (pointing downward)
-            debugState.past90Degrees = angle > 90;
+            // For right hand, past vertical means angle < 90 (forward release position)
+            debugState.past90Degrees = angle < 90;
             
             // Add to angle history
             angleHistory.right.push({ 
@@ -275,9 +275,8 @@ function onResults(results) {
                 wristSpeedElement.textContent = `${angularVelocity.toFixed(0)}°/s`;
                 
                 // Check for forward shooting motion
-                // For right hand: angle should progress from negative (cocked back) to positive (forward)
-                // and pass through 90° (pointing down)
-                const isForwardMotion = angleDiff > 0 && recent.angle > 90 && previous.angle < 90;
+                // For right hand: angle should progress from >90° (cocked back) to <90° (forward release)
+                const isForwardMotion = angleDiff < 0 && recent.angle < 90 && previous.angle > 90;
                 
                 // Check all conditions for shot detection
                 if (shotCooldown === 0 &&
@@ -420,8 +419,8 @@ startBtn.addEventListener('click', async () => {
     canvasElement.width = videoElement.videoWidth || 1280;
     canvasElement.height = videoElement.videoHeight || 720;
     
-    console.log('MediaPipe Holistic initialized - tracking with face landmarks and pose');
-    console.log('Detection requires: 1) Face angle < 20°, 2) Right shoulder forward, 3) Wrist above shoulder, 4) Angle > 90°, 5) Velocity > 300°/s');
+    console.log('MediaPipe Holistic initialized - tracking with index finger');
+    console.log('Detection requires: 1) Face angle < 20°, 2) Right shoulder forward, 3) Wrist above shoulder, 4) Angle < 90°, 5) Velocity > 300°/s');
 });
 
 stopBtn.addEventListener('click', () => {
