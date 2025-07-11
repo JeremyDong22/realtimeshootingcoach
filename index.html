@@ -3,85 +3,254 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>Basketball Shot Detection - MediaPipe Pose 3D</title>
-    <link rel="stylesheet" href="style.css">
+    <title>Shooting Coach - AI Basketball Training</title>
+    <link rel="manifest" href="/manifest.json">
+    <link rel="stylesheet" href="styles.css">
+    <meta name="theme-color" content="#000000">
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-status-bar-style" content="default">
 </head>
 <body>
     <div class="container">
-        <video id="video" playsinline></video>
-        <canvas id="canvas"></canvas>
-        
-        <div class="controls">
-            <button id="startBtn" class="btn">Start Camera</button>
-            <button id="stopBtn" class="btn" style="display: none;">Stop Camera</button>
+        <!-- Index/Landing Page -->
+        <div id="indexPage" class="page index-page active">
+            <!-- Basketball Icon -->
+            <svg class="basketball-icon" viewBox="0 0 100 100" fill="none" xmlns="http://www.w3.org/2000/svg">
+                <circle cx="50" cy="50" r="48" stroke="#1A1A1A" stroke-width="2"/>
+                <path d="M50 2 C50 2, 50 98, 50 98" stroke="#1A1A1A" stroke-width="2"/>
+                <path d="M2 50 C2 50, 98 50, 98 50" stroke="#1A1A1A" stroke-width="2"/>
+                <path d="M50 2 Q25 25, 2 50 Q25 75, 50 98 Q75 75, 98 50 Q75 25, 50 2" stroke="#1A1A1A" stroke-width="2" fill="none"/>
+            </svg>
+
+            <div class="brand-section">
+                <h1 class="brand-title">Shooting Coach</h1>
+                
+                <!-- Follow-through Hand Icon -->
+                <svg class="hand-icon" viewBox="0 0 120 120" fill="none" xmlns="http://www.w3.org/2000/svg">
+                    <!-- Wrist and palm -->
+                    <path d="M60 80 L60 100 L40 100 L40 60 L60 60 Z" stroke="#1A1A1A" stroke-width="2" fill="none"/>
+                    <!-- Fingers in follow-through position -->
+                    <path d="M40 60 L35 40 Q35 35, 40 35 L45 55" stroke="#1A1A1A" stroke-width="2" fill="none" stroke-linecap="round"/>
+                    <path d="M45 60 L43 35 Q43 30, 48 30 L50 55" stroke="#1A1A1A" stroke-width="2" fill="none" stroke-linecap="round"/>
+                    <path d="M50 60 L50 30 Q50 25, 55 25 L55 55" stroke="#1A1A1A" stroke-width="2" fill="none" stroke-linecap="round"/>
+                    <path d="M55 60 L57 35 Q57 30, 62 30 L60 55" stroke="#1A1A1A" stroke-width="2" fill="none" stroke-linecap="round"/>
+                    <!-- Thumb -->
+                    <path d="M60 70 L70 65 Q75 63, 75 68 L65 75" stroke="#1A1A1A" stroke-width="2" fill="none" stroke-linecap="round"/>
+                    <!-- Motion lines -->
+                    <path d="M30 45 L25 43" stroke="#1A1A1A" stroke-width="1" opacity="0.5"/>
+                    <path d="M30 50 L25 50" stroke="#1A1A1A" stroke-width="1" opacity="0.5"/>
+                    <path d="M30 55 L25 57" stroke="#1A1A1A" stroke-width="1" opacity="0.5"/>
+                </svg>
+
+                <div class="auth-buttons">
+                    <button class="btn btn-secondary" onclick="showAuth('login')">Log In</button>
+                    <button class="btn btn-primary" onclick="showAuth('signup')">Sign Up</button>
+                </div>
+            </div>
+
+            <div class="credits">
+                <p>Powered by MediaPipe</p>
+                <p>Made by Jeremy Dong</p>
+            </div>
         </div>
-        
-        <div class="info-panel">
-            <div class="info-item">
-                <span class="label">FPS:</span>
-                <span id="fps">0</span>
+
+        <!-- Home Page -->
+        <div id="homePage" class="page">
+            <div class="home-header">
+                <div class="stats-section">
+                    <div class="stat-item">
+                        <div class="stat-label">Total Shots</div>
+                        <div class="stat-value" id="totalShots">0</div>
+                    </div>
+                    <div class="stat-item">
+                        <div class="stat-label">Accuracy</div>
+                        <div class="stat-value" id="accuracy">--%</div>
+                    </div>
+                    <div class="stat-item">
+                        <div class="stat-label">Avg Speed</div>
+                        <div class="stat-value" id="avgSpeed">--°/s</div>
+                    </div>
+                    <div class="stat-item">
+                        <div class="stat-label">CoM Deviation</div>
+                        <div class="stat-value" id="comDeviation">--cm</div>
+                    </div>
+                </div>
+                <button class="share-btn" onclick="shareStats()">
+                    <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                        <path d="M4 12v8a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-8"/>
+                        <polyline points="16 6 12 2 8 6"/>
+                        <line x1="12" y1="2" x2="12" y2="15"/>
+                    </svg>
+                </button>
             </div>
-            <div class="info-item">
-                <span class="label">Left Wrist:</span>
-                <span id="leftWrist">-</span>
-            </div>
-            <div class="info-item">
-                <span class="label">Right Wrist:</span>
-                <span id="rightWrist">-</span>
-            </div>
-            <div class="info-item">
-                <span class="label">Wrist Angular Speed:</span>
-                <span id="wristSpeed">-</span>
+
+            <div class="body-heatmap">
+                <svg class="body-svg" viewBox="0 0 200 400" xmlns="http://www.w3.org/2000/svg">
+                    <!-- Head -->
+                    <circle cx="100" cy="40" r="25" fill="none" stroke="#1A1A1A" stroke-width="2"/>
+                    
+                    <!-- Body sections with IDs for heatmap -->
+                    <!-- Below knee -->
+                    <path id="section-shin" d="M80 280 L75 350 L85 350 L90 280" fill="none" stroke="#1A1A1A" stroke-width="2" class="body-section"/>
+                    <path id="section-shin2" d="M110 280 L115 350 L125 350 L120 280" fill="none" stroke="#1A1A1A" stroke-width="2" class="body-section"/>
+                    
+                    <!-- Above knee to hip -->
+                    <path id="section-thigh" d="M90 200 L80 280 L90 280 L95 200" fill="none" stroke="#1A1A1A" stroke-width="2" class="body-section"/>
+                    <path id="section-thigh2" d="M105 200 L110 280 L120 280 L110 200" fill="none" stroke="#1A1A1A" stroke-width="2" class="body-section"/>
+                    
+                    <!-- Trunk -->
+                    <rect id="section-trunk" x="70" y="100" width="60" height="100" rx="10" fill="none" stroke="#1A1A1A" stroke-width="2" class="body-section"/>
+                    
+                    <!-- Shoulder to elbow -->
+                    <path id="section-upperarm" d="M70 110 L50 170 L60 175 L75 115" fill="none" stroke="#1A1A1A" stroke-width="2" class="body-section"/>
+                    <path id="section-upperarm2" d="M130 110 L150 170 L140 175 L125 115" fill="none" stroke="#1A1A1A" stroke-width="2" class="body-section"/>
+                    
+                    <!-- Elbow to wrist -->
+                    <path id="section-forearm" d="M50 170 L40 230 L50 232 L58 172" fill="none" stroke="#1A1A1A" stroke-width="2" class="body-section"/>
+                    <path id="section-forearm2" d="M150 170 L160 230 L150 232 L142 172" fill="none" stroke="#1A1A1A" stroke-width="2" class="body-section"/>
+                    
+                    <!-- Fadeaway pose indication -->
+                    <path d="M100 350 Q90 340, 85 330" stroke="#1A1A1A" stroke-width="1" stroke-dasharray="2,2" opacity="0.5"/>
+                    <circle cx="165" cy="220" r="15" fill="none" stroke="#1A1A1A" stroke-width="1" stroke-dasharray="2,2" opacity="0.5"/>
+                </svg>
             </div>
         </div>
-        
-        <!-- Debug Panel -->
-        <div class="debug-panel" id="debugPanel">
-            <h3>Debug Info</h3>
-            <div class="debug-item">
-                <span class="label">Pose Detected:</span>
-                <span id="poseDetected">No</span>
+
+        <!-- Community Page -->
+        <div id="communityPage" class="page">
+            <h2 class="page-title">Locker Room</h2>
+            <div class="community-feed">
+                <!-- Community posts will be dynamically loaded here -->
+                <div class="empty-state">
+                    <p>No posts yet. Be the first to share!</p>
+                </div>
             </div>
-            <div class="debug-item">
-                <span class="label">Past 90° Forward:</span>
-                <span id="past90Degrees">No</span>
+        </div>
+
+        <!-- Replay Page -->
+        <div id="replayPage" class="page">
+            <h2 class="page-title">Shot Replays</h2>
+            <div class="replay-grid">
+                <!-- Replay videos will be dynamically loaded here -->
+                <div class="empty-state">
+                    <p>No replays yet. Start training to see your shots!</p>
+                </div>
             </div>
-            <div class="debug-item">
-                <span class="label">Wrist Above Nose:</span>
-                <span id="wristAboveShoulder">No</span>
+        </div>
+
+        <!-- Training Page -->
+        <div id="trainingPage" class="page">
+            <div class="training-container">
+                <div id="videoContainer" class="video-container">
+                    <!-- MediaPipe camera will be loaded here -->
+                </div>
             </div>
-            <div class="debug-item">
-                <span class="label">Current Angle:</span>
-                <span id="currentAngle">-</span>
+        </div>
+
+        <!-- Analytics Page -->
+        <div id="analyticsPage" class="page">
+            <h2 class="page-title">Performance Analytics</h2>
+            <div class="analytics-dashboard">
+                <!-- Charts will be dynamically loaded here -->
+                <div class="empty-state">
+                    <p>Start training to see your analytics!</p>
+                </div>
             </div>
-            <div class="debug-item">
-                <span class="label">Angle Velocity:</span>
-                <span id="angleVelocity">-</span>
+        </div>
+
+        <!-- Settings Page -->
+        <div id="settingsPage" class="page">
+            <h2 class="page-title">Profile & Settings</h2>
+            <div class="settings-content">
+                <div class="form-group">
+                    <label class="form-label">Name</label>
+                    <input type="text" class="form-input" id="userName" placeholder="Your name">
+                </div>
+                <div class="form-group">
+                    <label class="form-label">Height</label>
+                    <input type="text" class="form-input" id="userHeight" placeholder="e.g., 6'2\"">
+                </div>
+                <div class="form-group">
+                    <label class="form-label">Position</label>
+                    <select class="form-input" id="userPosition">
+                        <option value="">Select position</option>
+                        <option value="PG">Point Guard</option>
+                        <option value="SG">Shooting Guard</option>
+                        <option value="SF">Small Forward</option>
+                        <option value="PF">Power Forward</option>
+                        <option value="C">Center</option>
+                    </select>
+                </div>
+                <div class="form-group">
+                    <label class="form-label">Shooting Hand</label>
+                    <select class="form-input" id="shootingHand">
+                        <option value="right">Right</option>
+                        <option value="left">Left</option>
+                    </select>
+                </div>
             </div>
-            <div class="debug-item">
-                <span class="label">Detection State:</span>
-                <span id="detectionState">Idle</span>
+        </div>
+
+        <!-- Navigation Bar -->
+        <nav class="nav-bar" id="navBar" style="display: none;">
+            <div class="nav-item" onclick="navigateTo('community')">
+                <svg class="nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                    <path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/>
+                    <circle cx="12" cy="7" r="4"/>
+                </svg>
+                <span class="nav-label">Locker Room</span>
             </div>
-            <div class="debug-item">
-                <span class="label">Wrist U-Shape Detected:</span>
-                <span id="uShapeDetected">No</span>
+            <div class="nav-item" onclick="navigateTo('replay')">
+                <svg class="nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                    <polygon points="5 3 19 12 5 21 5 3"/>
+                </svg>
+                <span class="nav-label">Replays</span>
             </div>
-            <div class="debug-item">
-                <span class="label">Last Shot Start Time:</span>
-                <span id="shotStartTime">-</span>
+            <div class="nav-item active" onclick="navigateTo('training')">
+                <svg class="nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                    <circle cx="12" cy="12" r="10" stroke-width="1.5"/>
+                    <path d="M12 8v8M8 12h8" stroke-width="2"/>
+                </svg>
+                <span class="nav-label">Train</span>
             </div>
-            <div class="debug-item">
-                <span class="label">Last Shot Duration:</span>
-                <span id="shotDuration">-</span>
+            <div class="nav-item" onclick="navigateTo('analytics')">
+                <svg class="nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                    <line x1="18" y1="20" x2="18" y2="10"/>
+                    <line x1="12" y1="20" x2="12" y2="4"/>
+                    <line x1="6" y1="20" x2="6" y2="14"/>
+                </svg>
+                <span class="nav-label">Analytics</span>
+            </div>
+            <div class="nav-item" onclick="navigateTo('settings')">
+                <svg class="nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                    <path d="M12 2L12 8M12 8L7 5M12 8L17 5"/>
+                    <rect x="7" y="10" width="10" height="12" rx="2"/>
+                    <circle cx="12" cy="16" r="2"/>
+                </svg>
+                <span class="nav-label">Profile</span>
+            </div>
+        </nav>
+
+        <!-- Auth Modal -->
+        <div id="authModal" class="modal">
+            <div class="modal-content">
+                <h2 class="modal-header" id="authTitle">Log In</h2>
+                <form id="authForm" onsubmit="handleAuth(event)">
+                    <div class="form-group">
+                        <label class="form-label">Email</label>
+                        <input type="email" class="form-input" id="authEmail" required>
+                    </div>
+                    <div class="form-group">
+                        <label class="form-label">Password</label>
+                        <input type="password" class="form-input" id="authPassword" required>
+                    </div>
+                    <button type="submit" class="btn btn-primary" style="width: 100%;">Continue</button>
+                    <button type="button" class="btn btn-secondary mt-2" style="width: 100%;" onclick="closeAuth()">Cancel</button>
+                </form>
             </div>
         </div>
     </div>
 
-    <script src="https://cdn.jsdelivr.net/npm/@mediapipe/pose/pose.js" crossorigin="anonymous"></script>
-    <script src="https://cdn.jsdelivr.net/npm/@mediapipe/camera_utils/camera_utils.js" crossorigin="anonymous"></script>
-    <script src="https://cdn.jsdelivr.net/npm/@mediapipe/drawing_utils/drawing_utils.js" crossorigin="anonymous"></script>
-    <!-- ONNX Runtime disabled for performance - uncomment to enable YOLO -->
-    <!-- <script src="https://cdn.jsdelivr.net/npm/onnxruntime-web@1.16.3/dist/ort.min.js"></script> -->
-    <script src="app.js"></script>
+    <script src="app-navigation.js"></script>
 </body>
 </html>
