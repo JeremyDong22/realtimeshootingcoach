@@ -190,8 +190,9 @@ function onResults(results) {
         const earDz = rightEar.z - leftEar.z;
         const faceAngle = Math.atan2(earDx, earDz) * 180 / Math.PI;
         
-        // Accept right-facing angles from -30° to +20°
-        const shootingFromRightSide = faceAngle >= -30 && faceAngle <= 20;
+        // When facing right, left ear is behind right ear (negative angle)
+        // Accept left-facing angles (which means right side is visible to camera)
+        const shootingFromRightSide = faceAngle <= -20 || faceAngle >= 160;
         debugState.shootingSideOk = shootingFromRightSide;
         
         // Update debug state with face angle
