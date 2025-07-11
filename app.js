@@ -46,6 +46,7 @@ let shotCooldown = 0;
 
 // Basketball detection
 let basketballModel = null;
+let useSimulatedDetection = false; // Fallback if model doesn't load
 const basketballHistory = [];
 const MAX_BASKETBALL_HISTORY = 90; // 3 seconds at 30fps
 let shotAnalysisData = null;
@@ -74,12 +75,29 @@ async function loadBasketballModel() {
     } catch (error) {
         console.error('Error loading basketball model:', error);
         console.error('Make sure basketballModel.onnx exists (convert from .pt using export)');
+        console.warn('Falling back to simulated detection for testing');
+        useSimulatedDetection = true;
     }
 }
 
 // Detect basketball in frame
 async function detectBasketball(imageElement) {
-    if (!basketballModel) return null;
+    // Use simulated detection if model not loaded
+    if (useSimulatedDetection) {
+        const rightWrist = wristHistory.right[wristHistory.right.length - 1];
+        if (rightWrist && Math.random() > 0.3) {
+            return {
+                x: rightWrist.x + (Math.random() - 0.5) * 100,
+                y: rightWrist.y - 50 + (Math.random() - 0.5) * 40,
+                confidence: 0.85
+            };
+        }
+        return null;
+    }
+    
+    if (!basketballModel) {
+        return null;
+    }
     
     try {
         // Prepare input tensor for YOLO (typically 640x640)
@@ -107,16 +125,31 @@ async function detectBasketball(imageElement) {
         const inputTensor = new ort.Tensor('float32', input, [1, 3, 640, 640]);
         
         // Run inference
-        const results = await basketballModel.run({ images: inputTensor });
-        const output = results.output0 || results[Object.keys(results)[0]];
+        const feeds = {};
+        feeds[basketballModel.inputNames[0]] = inputTensor;
+        const results = await basketballModel.run(feeds);
+        const output = results[basketballModel.outputNames[0]];
         
-        // Parse YOLO output (assuming YOLOv8 format)
-        const boxes = parseYOLOOutput(output.data, output.dims);
+        console.log('YOLO output shape:', output.dims);
+        console.log('YOLO output sample:', output.data.slice(0, 10));
+        
+        // Parse YOLO output - try different formats
+        let boxes = [];
+        
+        // YOLOv11/v8 format: [1, 84, 8400] or [1, 6, 8400]
+        if (output.dims[1] === 84 || output.dims[1] === 6) {
+            boxes = parseYOLOv8Output(output.data, output.dims);
+        } else {
+            console.warn('Unknown YOLO output format:', output.dims);
+        }
+        
+        console.log(`Found ${boxes.length} boxes`);
         
         // Find basketball (class 0 in our model)
-        const basketball = boxes.find(box => box.class === 0 && box.confidence > 0.5);
+        const basketball = boxes.find(box => box.class === 0 && box.confidence > 0.3);
         
         if (basketball) {
+            console.log('Basketball detected:', basketball);
             // Scale coordinates back to original canvas size
             return {
                 x: (basketball.x / 640) * canvasElement.width,
@@ -131,27 +164,39 @@ async function detectBasketball(imageElement) {
     return null;
 }
 
-// Parse YOLO output format
-function parseYOLOOutput(data, dims) {
+// Parse YOLOv8/v11 output format
+function parseYOLOv8Output(data, dims) {
     const boxes = [];
-    const numBoxes = dims[1];
+    const rows = dims[1]; // 84 for YOLOv8 (4 bbox + 80 classes)
+    const cols = dims[2]; // 8400 predictions
     
-    for (let i = 0; i < numBoxes; i++) {
-        const x = data[i * 6 + 0];
-        const y = data[i * 6 + 1];
-        const w = data[i * 6 + 2];
-        const h = data[i * 6 + 3];
-        const confidence = data[i * 6 + 4];
-        const classId = data[i * 6 + 5];
+    for (let i = 0; i < cols; i++) {
+        // Get bbox coordinates
+        const x = data[0 * cols + i];
+        const y = data[1 * cols + i];
+        const w = data[2 * cols + i];
+        const h = data[3 * cols + i];
         
-        if (confidence > 0.5) {
+        // Get class scores (starting from index 4)
+        let maxScore = 0;
+        let maxClass = 0;
+        
+        for (let c = 0; c < rows - 4; c++) {
+            const score = data[(4 + c) * cols + i];
+            if (score > maxScore) {
+                maxScore = score;
+                maxClass = c;
+            }
+        }
+        
+        if (maxScore > 0.3) {
             boxes.push({
                 x: x,
                 y: y,
                 width: w,
                 height: h,
-                confidence: confidence,
-                class: classId
+                confidence: maxScore,
+                class: maxClass
             });
         }
     }
