@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>MediaPipe Wrist Tracking Test</title>
+    <title>Basketball Shot Detection - MediaPipe Pose 3D</title>
     <link rel="stylesheet" href="style.css">
 </head>
 <body>
@@ -30,7 +30,7 @@
                 <span id="rightWrist">-</span>
             </div>
             <div class="info-item">
-                <span class="label">Angular Speed:</span>
+                <span class="label">Wrist Angular Speed:</span>
                 <span id="wristSpeed">-</span>
             </div>
         </div>
@@ -47,7 +47,7 @@
                 <span id="past90Degrees">No</span>
             </div>
             <div class="debug-item">
-                <span class="label">Wrist Above Shoulder:</span>
+                <span class="label">Wrist Above Nose:</span>
                 <span id="wristAboveShoulder">No</span>
             </div>
             <div class="debug-item">
@@ -63,29 +63,21 @@
                 <span id="detectionState">Idle</span>
             </div>
             <div class="debug-item">
-                <span class="label">Ball Detected:</span>
-                <span id="ballDetected">No</span>
-            </div>
-            <div class="debug-item">
-                <span class="label">Ball Position:</span>
-                <span id="ballPosition">-</span>
-            </div>
-            <div class="debug-item">
-                <span class="label">U-Shape Detected:</span>
+                <span class="label">Wrist U-Shape Detected:</span>
                 <span id="uShapeDetected">No</span>
             </div>
             <div class="debug-item">
-                <span class="label">Shot Start Time:</span>
+                <span class="label">Last Shot Start Time:</span>
                 <span id="shotStartTime">-</span>
             </div>
             <div class="debug-item">
-                <span class="label">Shot Duration:</span>
+                <span class="label">Last Shot Duration:</span>
                 <span id="shotDuration">-</span>
             </div>
         </div>
     </div>
 
-    <script src="https://cdn.jsdelivr.net/npm/@mediapipe/holistic/holistic.js" crossorigin="anonymous"></script>
+    <script src="https://cdn.jsdelivr.net/npm/@mediapipe/pose/pose.js" crossorigin="anonymous"></script>
     <script src="https://cdn.jsdelivr.net/npm/@mediapipe/camera_utils/camera_utils.js" crossorigin="anonymous"></script>
     <script src="https://cdn.jsdelivr.net/npm/@mediapipe/drawing_utils/drawing_utils.js" crossorigin="anonymous"></script>
     <!-- ONNX Runtime disabled for performance - uncomment to enable YOLO -->
