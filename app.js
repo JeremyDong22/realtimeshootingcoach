@@ -12,8 +12,8 @@ const wristSpeedElement = document.getElementById('wristSpeed');
 
 // Debug elements
 const poseDetectedElement = document.getElementById('poseDetected');
-const handActiveElement = document.getElementById('handActive');
-const handLandmarksElement = document.getElementById('handLandmarks');
+const shootingSideOkElement = document.getElementById('shootingSideOk');
+const past90DegreesElement = document.getElementById('past90Degrees');
 const wristAboveShoulderElement = document.getElementById('wristAboveShoulder');
 const currentAngleElement = document.getElementById('currentAngle');
 const angleVelocityElement = document.getElementById('angleVelocity');
@@ -36,44 +36,42 @@ const angleHistory = {
     right: []
 };
 
-// Hand angle history (more precise)
-const handAngleHistory = {
-    left: [],
-    right: []
-};
-
 // Shot detection state
 let shotDetected = false;
 let shotCooldown = 0;
 
-// Initialize MediaPipe Holistic
-const holistic = new Holistic({
+// Configuration - focusing on right hand only
+const SHOOTING_HAND = 'right';
+const VELOCITY_THRESHOLD = 300; // degrees per second
+
+// Initialize MediaPipe Pose
+const pose = new Pose({
     locateFile: (file) => {
-        return `https://cdn.jsdelivr.net/npm/@mediapipe/holistic/${file}`;
+        return `https://cdn.jsdelivr.net/npm/@mediapipe/pose/${file}`;
     }
 });
 
-holistic.setOptions({
+pose.setOptions({
     modelComplexity: 1,
     smoothLandmarks: true,
     enableSegmentation: false,
     smoothSegmentation: false,
-    refineFaceLandmarks: false,
     minDetectionConfidence: 0.5,
     minTrackingConfidence: 0.5
 });
 
-holistic.onResults(onResults);
+pose.onResults(onResults);
 
 function updateDebugInfo(state) {
     // Update debug panel
     poseDetectedElement.textContent = state.poseDetected ? 'Yes' : 'No';
     poseDetectedElement.className = state.poseDetected ? 'active' : '';
     
-    handActiveElement.textContent = state.handActive ? 'Yes' : 'No';
-    handActiveElement.className = state.handActive ? 'active' : '';
+    shootingSideOkElement.textContent = state.shootingSideOk ? 'Yes' : 'No';
+    shootingSideOkElement.className = state.shootingSideOk ? 'active' : '';
     
-    handLandmarksElement.textContent = state.handLandmarks || '0';
+    past90DegreesElement.textContent = state.past90Degrees ? 'Yes' : 'No';
+    past90DegreesElement.className = state.past90Degrees ? 'active' : '';
     
     wristAboveShoulderElement.textContent = state.wristAboveShoulder ? 'Yes' : 'No';
     wristAboveShoulderElement.className = state.wristAboveShoulder ? 'active' : '';
@@ -94,8 +92,8 @@ function onResults(results) {
     // Debug state
     const debugState = {
         poseDetected: false,
-        handActive: false,
-        handLandmarks: 0,
+        shootingSideOk: false,
+        past90Degrees: false,
         wristAboveShoulder: false,
         currentAngle: null,
         angleVelocity: null,
@@ -125,99 +123,122 @@ function onResults(results) {
             radius: 3
         });
 
-        // Get pose landmarks for shot detection
-        const leftWrist = results.poseLandmarks[15];
+        // Get landmarks
+        // Right side: wrist=16, pinky=18, shoulder=12, elbow=14
+        // Left side: wrist=15, pinky=17, shoulder=11, elbow=13
         const rightWrist = results.poseLandmarks[16];
-        const leftShoulder = results.poseLandmarks[11];
+        const rightPinky = results.poseLandmarks[18];
         const rightShoulder = results.poseLandmarks[12];
+        const rightElbow = results.poseLandmarks[14];
+        
+        const leftWrist = results.poseLandmarks[15];
+        const leftShoulder = results.poseLandmarks[11];
 
         // Update wrist position display
         leftWristElement.textContent = `x: ${leftWrist.x.toFixed(3)}, y: ${leftWrist.y.toFixed(3)}, z: ${leftWrist.z.toFixed(3)}`;
         rightWristElement.textContent = `x: ${rightWrist.x.toFixed(3)}, y: ${rightWrist.y.toFixed(3)}, z: ${rightWrist.z.toFixed(3)}`;
 
         // Convert normalized coordinates to canvas coordinates
-        const leftWristCanvas = {
-            x: leftWrist.x * canvasElement.width,
-            y: leftWrist.y * canvasElement.height
-        };
         const rightWristCanvas = {
             x: rightWrist.x * canvasElement.width,
             y: rightWrist.y * canvasElement.height
         };
+        
+        const rightPinkyCanvas = {
+            x: rightPinky.x * canvasElement.width,
+            y: rightPinky.y * canvasElement.height
+        };
+
+        const leftWristCanvas = {
+            x: leftWrist.x * canvasElement.width,
+            y: leftWrist.y * canvasElement.height
+        };
 
         // Add to history
-        wristHistory.left.push({...leftWristCanvas, time: currentTime});
         wristHistory.right.push({...rightWristCanvas, time: currentTime});
+        wristHistory.left.push({...leftWristCanvas, time: currentTime});
 
         // Keep history limited
-        if (wristHistory.left.length > MAX_HISTORY) wristHistory.left.shift();
         if (wristHistory.right.length > MAX_HISTORY) wristHistory.right.shift();
+        if (wristHistory.left.length > MAX_HISTORY) wristHistory.left.shift();
 
         // Draw wrist trails
         drawWristTrail(wristHistory.left, '#FF00FF');
         drawWristTrail(wristHistory.right, '#00FFFF');
 
-        // Highlight wrists with larger circles
+        // Highlight wrists and pinky
         drawWrist(leftWristCanvas, '#FF00FF', 'L');
         drawWrist(rightWristCanvas, '#00FFFF', 'R');
+        drawWrist(rightPinkyCanvas, '#FFD700', 'P'); // Draw pinky in gold
 
-        // Check if wrists are above shoulders
-        const leftWristAbove = leftWrist.y < leftShoulder.y;
-        const rightWristAbove = rightWrist.y < rightShoulder.y;
-        debugState.wristAboveShoulder = leftWristAbove || rightWristAbove;
+        // Check if right wrist is above shoulder
+        const wristAboveShoulder = rightWrist.y < rightShoulder.y;
+        debugState.wristAboveShoulder = wristAboveShoulder;
 
-        // Process hand landmarks if available
-        if (results.leftHandLandmarks && leftWristAbove) {
-            debugState.handActive = true;
-            debugState.handLandmarks = results.leftHandLandmarks.length;
+        // Check if shooting from the right side
+        // If elbow is to the right of shoulder, person is facing/shooting from right
+        const shootingFromRightSide = rightElbow.x > rightShoulder.x;
+        debugState.shootingSideOk = shootingFromRightSide;
+
+        if (wristAboveShoulder) {
+            // Calculate angle between wrist-pinky vector and vertical
+            const dx = rightPinky.x - rightWrist.x;
+            const dy = rightPinky.y - rightWrist.y;
             
-            // Draw hand skeleton
-            drawConnectors(canvasCtx, results.leftHandLandmarks, HAND_CONNECTIONS, {
-                color: '#FF00FF',
-                lineWidth: 3
+            // Calculate angle from vertical (0° = up, 90° = horizontal)
+            // atan2 gives angle from horizontal, so we adjust
+            const angleFromHorizontal = Math.atan2(dy, dx) * 180 / Math.PI;
+            const angleFromVertical = Math.abs(angleFromHorizontal - 90);
+            
+            debugState.currentAngle = angleFromVertical;
+            debugState.past90Degrees = angleFromVertical > 90;
+            
+            // Add to angle history
+            angleHistory.right.push({ 
+                angle: angleFromVertical, 
+                time: currentTime,
+                dx: dx,
+                dy: dy
             });
             
-            // Draw hand landmarks
-            drawLandmarks(canvasCtx, results.leftHandLandmarks, {
-                color: '#FF00FF',
-                lineWidth: 2,
-                radius: 4
-            });
-
-            // Calculate precise angle using hand landmarks
-            processHandForShot(results.leftHandLandmarks, 'left', currentTime, debugState);
-        }
-
-        if (results.rightHandLandmarks && rightWristAbove) {
-            debugState.handActive = true;
-            debugState.handLandmarks = results.rightHandLandmarks.length;
+            // Keep history limited
+            if (angleHistory.right.length > 10) {
+                angleHistory.right.shift();
+            }
             
-            // Draw hand skeleton
-            drawConnectors(canvasCtx, results.rightHandLandmarks, HAND_CONNECTIONS, {
-                color: '#00FFFF',
-                lineWidth: 3
-            });
-            
-            // Draw hand landmarks
-            drawLandmarks(canvasCtx, results.rightHandLandmarks, {
-                color: '#00FFFF',
-                lineWidth: 2,
-                radius: 4
-            });
-
-            // Calculate precise angle using hand landmarks
-            processHandForShot(results.rightHandLandmarks, 'right', currentTime, debugState);
-        }
-
-        // If no hand detected but wrist is up, use pose landmarks
-        if (!results.leftHandLandmarks && leftWristAbove) {
-            const leftIndex = results.poseLandmarks[19];
-            processPoseForShot(leftWrist, leftIndex, 'left', currentTime, debugState);
-        }
-        
-        if (!results.rightHandLandmarks && rightWristAbove) {
-            const rightIndex = results.poseLandmarks[20];
-            processPoseForShot(rightWrist, rightIndex, 'right', currentTime, debugState);
+            // Calculate angular velocity if we have enough history
+            if (angleHistory.right.length >= 3) {
+                const recent = angleHistory.right[angleHistory.right.length - 1];
+                const previous = angleHistory.right[angleHistory.right.length - 3];
+                
+                const angleDiff = recent.angle - previous.angle;
+                const timeDiff = (recent.time - previous.time) / 1000; // seconds
+                const angularVelocity = Math.abs(angleDiff / timeDiff);
+                
+                debugState.angleVelocity = angularVelocity;
+                
+                // Update display with angular velocity
+                wristSpeedElement.textContent = `${angularVelocity.toFixed(0)}°/s`;
+                
+                // Check all conditions for shot detection
+                if (shotCooldown === 0 &&
+                    wristAboveShoulder &&
+                    shootingFromRightSide &&
+                    angleFromVertical > 90 &&
+                    angularVelocity > VELOCITY_THRESHOLD &&
+                    angleDiff > 0) { // Positive angle change means moving downward
+                    
+                    // Additional check: ensure wrist is flicking forward (dx should be positive for right hand)
+                    if (recent.dx > 0) {
+                        debugState.detectionState = 'Shot Detected!';
+                        console.log(`SHOT DETECTED! Velocity: ${angularVelocity.toFixed(0)}°/s, Angle: ${angleFromVertical.toFixed(1)}°`);
+                        triggerShotDetection();
+                    }
+                }
+            }
+        } else {
+            // Clear angle history when wrist is below shoulder
+            angleHistory.right = [];
         }
     }
 
@@ -232,96 +253,6 @@ function onResults(results) {
     }
 
     canvasCtx.restore();
-}
-
-function processHandForShot(handLandmarks, side, currentTime, debugState) {
-    // Use wrist (0) and middle finger MCP (9) for more stable angle
-    const wrist = handLandmarks[0];
-    const middleMcp = handLandmarks[9];
-    
-    // Calculate angle
-    const dx = middleMcp.x - wrist.x;
-    const dy = middleMcp.y - wrist.y;
-    const angle = Math.atan2(dy, dx) * 180 / Math.PI;
-    
-    debugState.currentAngle = angle;
-    
-    // Add to hand angle history
-    handAngleHistory[side].push({ angle, time: currentTime });
-    
-    // Keep history limited
-    if (handAngleHistory[side].length > 10) {
-        handAngleHistory[side].shift();
-    }
-    
-    // Calculate angular velocity if we have enough history
-    if (handAngleHistory[side].length >= 3) {
-        const recent = handAngleHistory[side][handAngleHistory[side].length - 1];
-        const previous = handAngleHistory[side][handAngleHistory[side].length - 3];
-        
-        const angleDiff = recent.angle - previous.angle;
-        const timeDiff = (recent.time - previous.time) / 1000; // seconds
-        const angularVelocity = Math.abs(angleDiff / timeDiff);
-        
-        debugState.angleVelocity = angularVelocity;
-        
-        // Update display with angular velocity
-        wristSpeedElement.textContent = `${angularVelocity.toFixed(0)}°/s`;
-        
-        // Check for shooting motion - lowered threshold to 150°/s (half of 300)
-        if (angularVelocity > 150 && angleDiff > 0 && shotCooldown === 0) {
-            debugState.detectionState = 'Shot Detected!';
-            
-            // Additional check: ensure the motion is forward
-            if (previous.angle < 0 && recent.angle > previous.angle) {
-                console.log(`SHOT DETECTED! Hand tracking - Side: ${side}, Velocity: ${angularVelocity.toFixed(0)}°/s`);
-                triggerShotDetection();
-            }
-        }
-    }
-}
-
-function processPoseForShot(wrist, index, side, currentTime, debugState) {
-    // Calculate angle between wrist-index vector
-    const dx = index.x - wrist.x;
-    const dy = index.y - wrist.y;
-    const angle = Math.atan2(dy, dx) * 180 / Math.PI;
-    
-    debugState.currentAngle = angle;
-    
-    // Add to angle history
-    angleHistory[side].push({ angle, time: currentTime });
-    
-    // Keep history limited
-    if (angleHistory[side].length > 10) {
-        angleHistory[side].shift();
-    }
-    
-    // Calculate angular velocity if we have enough history
-    if (angleHistory[side].length >= 3) {
-        const recent = angleHistory[side][angleHistory[side].length - 1];
-        const previous = angleHistory[side][angleHistory[side].length - 3];
-        
-        const angleDiff = recent.angle - previous.angle;
-        const timeDiff = (recent.time - previous.time) / 1000; // seconds
-        const angularVelocity = Math.abs(angleDiff / timeDiff);
-        
-        debugState.angleVelocity = angularVelocity;
-        
-        // Update display with angular velocity
-        wristSpeedElement.textContent = `${angularVelocity.toFixed(0)}°/s`;
-        
-        // Check for shooting motion - lowered threshold to 150°/s
-        if (angularVelocity > 150 && angleDiff > 0 && shotCooldown === 0) {
-            debugState.detectionState = 'Shot Detected!';
-            
-            // Additional check: ensure the motion is forward
-            if (previous.angle < 0 && recent.angle > previous.angle) {
-                console.log(`SHOT DETECTED! Pose tracking - Side: ${side}, Velocity: ${angularVelocity.toFixed(0)}°/s`);
-                triggerShotDetection();
-            }
-        }
-    }
 }
 
 function drawWristTrail(history, color) {
@@ -419,7 +350,7 @@ startBtn.addEventListener('click', async () => {
 
     camera = new Camera(videoElement, {
         onFrame: async () => {
-            await holistic.send({ image: videoElement });
+            await pose.send({ image: videoElement });
         },
         width: 1280,
         height: 720
@@ -431,7 +362,8 @@ startBtn.addEventListener('click', async () => {
     canvasElement.width = videoElement.videoWidth || 1280;
     canvasElement.height = videoElement.videoHeight || 720;
     
-    console.log('MediaPipe Holistic initialized - tracking pose + hands');
+    console.log('MediaPipe Pose initialized - tracking with pinky finger');
+    console.log('Detection requires: 1) Right side view, 2) Wrist above shoulder, 3) Angle > 90°, 4) Velocity > 300°/s');
 });
 
 stopBtn.addEventListener('click', () => {
@@ -450,14 +382,12 @@ stopBtn.addEventListener('click', () => {
     wristHistory.right = [];
     angleHistory.left = [];
     angleHistory.right = [];
-    handAngleHistory.left = [];
-    handAngleHistory.right = [];
     
     // Reset debug info
     updateDebugInfo({
         poseDetected: false,
-        handActive: false,
-        handLandmarks: 0,
+        shootingSideOk: false,
+        past90Degrees: false,
         wristAboveShoulder: false,
         currentAngle: null,
         angleVelocity: null,

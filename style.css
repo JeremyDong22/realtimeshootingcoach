@@ -229,16 +229,12 @@ canvas {
     font-weight: bold;
 }
 
-#poseDetected, #handActive, #wristAboveShoulder {
+#poseDetected, #shootingSideOk, #past90Degrees, #wristAboveShoulder {
     color: #ff4444;
 }
 
-#poseDetected.active, #handActive.active, #wristAboveShoulder.active {
+#poseDetected.active, #shootingSideOk.active, #past90Degrees.active, #wristAboveShoulder.active {
     color: #44ff44;
-}
-
-#handLandmarks {
-    color: #00FFFF;
 }
 
 #currentAngle, #angleVelocity {
