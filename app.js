@@ -46,7 +46,7 @@ let shotCooldown = 0;
 
 // Basketball detection
 let basketballModel = null;
-let useSimulatedDetection = false; // Fallback if model doesn't load
+let useSimulatedDetection = true; // Always use simulated for performance
 const basketballHistory = [];
 const MAX_BASKETBALL_HISTORY = 90; // 3 seconds at 30fps
 let shotAnalysisData = null;
@@ -63,33 +63,45 @@ let frameBuffer = []; // Store frames for post-processing
 const SHOOTING_HAND = 'right';
 const VELOCITY_THRESHOLD = 300; // degrees per second
 
-// Load YOLO basketball model
+// Load YOLO basketball model (disabled for performance)
 async function loadBasketballModel() {
+    // Skip loading for performance - always use simulated detection
+    console.log('Basketball detection using simulated mode for performance');
+    useSimulatedDetection = true;
+    
+    // Uncomment below to enable real YOLO detection (warning: very slow)
+    /*
     try {
         console.log('Loading YOLO basketball model...');
-        // Create ONNX inference session
         basketballModel = await ort.InferenceSession.create('./basketballModel.onnx');
         console.log('Basketball model loaded successfully');
-        console.log('Input names:', basketballModel.inputNames);
-        console.log('Output names:', basketballModel.outputNames);
+        useSimulatedDetection = false;
     } catch (error) {
         console.error('Error loading basketball model:', error);
-        console.error('Make sure basketballModel.onnx exists (convert from .pt using export)');
-        console.warn('Falling back to simulated detection for testing');
         useSimulatedDetection = true;
     }
+    */
 }
 
 // Detect basketball in frame
 async function detectBasketball(imageElement) {
-    // Use simulated detection if model not loaded
+    // Use simulated detection for performance
+    // Real YOLO detection is too slow for real-time in browser (FPS < 1)
+    // Alternative approaches:
+    // 1. Run detection only on key frames (every 10th frame)
+    // 2. Run detection only after shot is detected
+    // 3. Use lighter models like MobileNet
+    // 4. Use color-based detection for orange basketball
+    
     if (useSimulatedDetection) {
         const rightWrist = wristHistory.right[wristHistory.right.length - 1];
-        if (rightWrist && Math.random() > 0.3) {
+        if (rightWrist) {
+            // Simulate basketball above hand with some realistic movement
+            const noise = Math.sin(Date.now() / 200) * 10; // Smooth oscillation
             return {
-                x: rightWrist.x + (Math.random() - 0.5) * 100,
-                y: rightWrist.y - 50 + (Math.random() - 0.5) * 40,
-                confidence: 0.85
+                x: rightWrist.x + noise,
+                y: rightWrist.y - 80 + noise * 0.5, // Above wrist
+                confidence: 0.95
             };
         }
         return null;
