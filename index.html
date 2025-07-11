@@ -71,6 +71,10 @@
                 <span id="ballPosition">-</span>
             </div>
             <div class="debug-item">
+                <span class="label">U-Shape Detected:</span>
+                <span id="uShapeDetected">No</span>
+            </div>
+            <div class="debug-item">
                 <span class="label">Shot Start Time:</span>
                 <span id="shotStartTime">-</span>
             </div>
@@ -84,7 +88,7 @@
     <script src="https://cdn.jsdelivr.net/npm/@mediapipe/holistic/holistic.js" crossorigin="anonymous"></script>
     <script src="https://cdn.jsdelivr.net/npm/@mediapipe/camera_utils/camera_utils.js" crossorigin="anonymous"></script>
     <script src="https://cdn.jsdelivr.net/npm/@mediapipe/drawing_utils/drawing_utils.js" crossorigin="anonymous"></script>
-    <script src="https://cdn.jsdelivr.net/npm/@tensorflow/tfjs@latest"></script>
+    <script src="https://cdn.jsdelivr.net/npm/onnxruntime-web@1.16.3/dist/ort.min.js"></script>
     <script src="app.js"></script>
 </body>
 </html>
