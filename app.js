@@ -65,31 +65,98 @@ const VELOCITY_THRESHOLD = 300; // degrees per second
 // Load YOLO basketball model
 async function loadBasketballModel() {
     try {
-        // Convert PyTorch model to TensorFlow.js format
-        // For now, we'll simulate basketball detection
-        console.log('Basketball model loading simulated - actual YOLO integration needed');
-        basketballModel = 'loaded'; // Placeholder
+        console.log('Loading YOLO basketball model...');
+        // Create ONNX inference session
+        basketballModel = await ort.InferenceSession.create('./basketballModel.onnx');
+        console.log('Basketball model loaded successfully');
+        console.log('Input names:', basketballModel.inputNames);
+        console.log('Output names:', basketballModel.outputNames);
     } catch (error) {
         console.error('Error loading basketball model:', error);
+        console.error('Make sure basketballModel.onnx exists (convert from .pt using export)');
     }
 }
 
 // Detect basketball in frame
-function detectBasketball(imageData) {
-    // Placeholder for actual YOLO inference
-    // Returns null or { x, y, confidence }
-    // For testing, we'll simulate detection near the hands
-    if (Math.random() > 0.3) { // 70% detection rate simulation
-        const rightWrist = wristHistory.right[wristHistory.right.length - 1];
-        if (rightWrist) {
+async function detectBasketball(imageElement) {
+    if (!basketballModel) return null;
+    
+    try {
+        // Prepare input tensor for YOLO (typically 640x640)
+        const canvas = document.createElement('canvas');
+        const ctx = canvas.getContext('2d');
+        canvas.width = 640;
+        canvas.height = 640;
+        
+        // Draw and scale image
+        ctx.drawImage(imageElement, 0, 0, 640, 640);
+        const imageData = ctx.getImageData(0, 0, 640, 640);
+        
+        // Convert to tensor format (CHW format for YOLO)
+        const input = new Float32Array(3 * 640 * 640);
+        for (let c = 0; c < 3; c++) {
+            for (let h = 0; h < 640; h++) {
+                for (let w = 0; w < 640; w++) {
+                    const idx = (h * 640 + w) * 4;
+                    input[c * 640 * 640 + h * 640 + w] = imageData.data[idx + c] / 255.0;
+                }
+            }
+        }
+        
+        // Create input tensor
+        const inputTensor = new ort.Tensor('float32', input, [1, 3, 640, 640]);
+        
+        // Run inference
+        const results = await basketballModel.run({ images: inputTensor });
+        const output = results.output0 || results[Object.keys(results)[0]];
+        
+        // Parse YOLO output (assuming YOLOv8 format)
+        const boxes = parseYOLOOutput(output.data, output.dims);
+        
+        // Find basketball (class 0 in our model)
+        const basketball = boxes.find(box => box.class === 0 && box.confidence > 0.5);
+        
+        if (basketball) {
+            // Scale coordinates back to original canvas size
             return {
-                x: rightWrist.x + (Math.random() - 0.5) * 50,
-                y: rightWrist.y - 30 + (Math.random() - 0.5) * 20,
-                confidence: 0.85 + Math.random() * 0.15
+                x: (basketball.x / 640) * canvasElement.width,
+                y: (basketball.y / 640) * canvasElement.height,
+                confidence: basketball.confidence
             };
         }
+    } catch (error) {
+        console.error('Basketball detection error:', error);
     }
+    
     return null;
+}
+
+// Parse YOLO output format
+function parseYOLOOutput(data, dims) {
+    const boxes = [];
+    const numBoxes = dims[1];
+    
+    for (let i = 0; i < numBoxes; i++) {
+        const x = data[i * 6 + 0];
+        const y = data[i * 6 + 1];
+        const w = data[i * 6 + 2];
+        const h = data[i * 6 + 3];
+        const confidence = data[i * 6 + 4];
+        const classId = data[i * 6 + 5];
+        
+        if (confidence > 0.5) {
+            boxes.push({
+                x: x,
+                y: y,
+                width: w,
+                height: h,
+                confidence: confidence,
+                class: classId
+            });
+        }
+    }
+    
+    return boxes;
 }
 
 // Find the U-shape bottom in basketball trajectory
@@ -200,7 +267,7 @@ function updateDebugInfo(state) {
     detectionStateElement.textContent = state.detectionState || 'Idle';
 }
 
-function onResults(results) {
+async function onResults(results) {
     // Calculate FPS
     const currentTime = Date.now();
     const deltaTime = currentTime - lastTime;
@@ -238,7 +305,7 @@ function onResults(results) {
     });
     
     // Detect basketball
-    const ballDetection = detectBasketball(results.image);
+    const ballDetection = await detectBasketball(results.image);
     if (ballDetection) {
         debugState.ballDetected = true;
         debugState.ballPosition = ballDetection;
@@ -556,21 +623,28 @@ function triggerShotDetection() {
 }
 
 // Save debug video with all overlays
-function saveDebugVideo() {
+async function saveDebugVideo() {
+    if (!shotAnalysisData || frameBuffer.length === 0) {
+        console.error('No shot data or frames to save');
+        return;
+    }
+    
     // Create timestamp for filename
     const now = new Date();
     const timestamp = now.toISOString().replace(/:/g, '-').replace(/\..+/, '');
     const filename = `shot_debug_${timestamp}.webm`;
     
     console.log(`Saving debug video: ${filename}`);
+    console.log(`Processing ${frameBuffer.length} frames from shot period`);
     
-    // Process frame buffer to create video
-    // For now, we'll save the current canvas state
-    // In production, you'd process the frameBuffer array
+    // Create a new canvas for rendering the video
+    const videoCanvas = document.createElement('canvas');
+    videoCanvas.width = canvasElement.width;
+    videoCanvas.height = canvasElement.height;
+    const videoCtx = videoCanvas.getContext('2d');
     
-    const canvas = document.getElementById('canvas');
-    const stream = canvas.captureStream(30);
-    
+    // Set up MediaRecorder
+    const stream = videoCanvas.captureStream(30);
     const recorder = new MediaRecorder(stream, {
         mimeType: 'video/webm;codecs=vp9'
     });
@@ -590,14 +664,76 @@ function saveDebugVideo() {
         a.download = filename;
         a.click();
         URL.revokeObjectURL(url);
-        console.log(`Debug video saved: ${filename}`);
+        console.log(`Debug video saved: ${filename} (${(blob.size / 1024 / 1024).toFixed(2)} MB)`);
     };
     
-    // Record for 1 second to capture the shot analysis overlay
+    // Start recording
     recorder.start();
-    setTimeout(() => {
-        recorder.stop();
-    }, 1000);
+    
+    // Find frames from shot start to release
+    const startTime = shotAnalysisData.startTime;
+    const endTime = shotAnalysisData.releaseTime;
+    
+    // Filter frames within the shot period
+    const shotFrames = frameBuffer.filter(frame => 
+        frame.time >= startTime && frame.time <= endTime
+    );
+    
+    console.log(`Found ${shotFrames.length} frames from shot period`);
+    
+    // Play back frames at 30fps
+    let frameIndex = 0;
+    const playbackInterval = setInterval(() => {
+        if (frameIndex >= shotFrames.length) {
+            // Add a final frame showing shot analysis
+            drawAnalysisOverlay(videoCtx);
+            
+            setTimeout(() => {
+                clearInterval(playbackInterval);
+                recorder.stop();
+            }, 1000); // Show analysis for 1 second
+            return;
+        }
+        
+        // Draw the frame
+        const frame = shotFrames[frameIndex];
+        videoCtx.putImageData(frame.imageData, 0, 0);
+        
+        // Add debug overlay
+        videoCtx.save();
+        videoCtx.fillStyle = 'rgba(0, 0, 0, 0.5)';
+        videoCtx.fillRect(0, 0, 250, 30);
+        videoCtx.fillStyle = '#FFFFFF';
+        videoCtx.font = '14px Arial';
+        videoCtx.fillText(`Frame ${frameIndex + 1}/${shotFrames.length} - ${new Date(frame.time).toLocaleTimeString()}`, 10, 20);
+        videoCtx.restore();
+        
+        frameIndex++;
+    }, 33); // ~30fps
+}
+
+// Draw final analysis overlay
+function drawAnalysisOverlay(ctx) {
+    // Semi-transparent background
+    ctx.save();
+    ctx.fillStyle = 'rgba(0, 0, 0, 0.7)';
+    ctx.fillRect(0, 0, ctx.canvas.width, ctx.canvas.height);
+    
+    // Analysis text
+    ctx.fillStyle = '#00FF00';
+    ctx.font = 'bold 24px Arial';
+    ctx.textAlign = 'center';
+    ctx.fillText('SHOT ANALYSIS COMPLETE', ctx.canvas.width / 2, 100);
+    
+    if (shotAnalysisData) {
+        ctx.font = '18px Arial';
+        ctx.fillStyle = '#FFFFFF';
+        ctx.fillText(`Shot Duration: ${shotAnalysisData.duration.toFixed(2)}s`, ctx.canvas.width / 2, 150);
+        ctx.fillText(`Start: ${new Date(shotAnalysisData.startTime).toLocaleTimeString()}`, ctx.canvas.width / 2, 180);
+        ctx.fillText(`Release: ${new Date(shotAnalysisData.releaseTime).toLocaleTimeString()}`, ctx.canvas.width / 2, 210);
+    }
+    
+    ctx.restore();
 }
 
 // Camera setup
