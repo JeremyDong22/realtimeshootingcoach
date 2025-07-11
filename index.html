@@ -62,12 +62,29 @@
                 <span class="label">Detection State:</span>
                 <span id="detectionState">Idle</span>
             </div>
+            <div class="debug-item">
+                <span class="label">Ball Detected:</span>
+                <span id="ballDetected">No</span>
+            </div>
+            <div class="debug-item">
+                <span class="label">Ball Position:</span>
+                <span id="ballPosition">-</span>
+            </div>
+            <div class="debug-item">
+                <span class="label">Shot Start Time:</span>
+                <span id="shotStartTime">-</span>
+            </div>
+            <div class="debug-item">
+                <span class="label">Shot Duration:</span>
+                <span id="shotDuration">-</span>
+            </div>
         </div>
     </div>
 
     <script src="https://cdn.jsdelivr.net/npm/@mediapipe/holistic/holistic.js" crossorigin="anonymous"></script>
     <script src="https://cdn.jsdelivr.net/npm/@mediapipe/camera_utils/camera_utils.js" crossorigin="anonymous"></script>
     <script src="https://cdn.jsdelivr.net/npm/@mediapipe/drawing_utils/drawing_utils.js" crossorigin="anonymous"></script>
+    <script src="https://cdn.jsdelivr.net/npm/@tensorflow/tfjs@latest"></script>
     <script src="app.js"></script>
 </body>
 </html>

@@ -17,6 +17,10 @@ const wristAboveShoulderElement = document.getElementById('wristAboveShoulder');
 const currentAngleElement = document.getElementById('currentAngle');
 const angleVelocityElement = document.getElementById('angleVelocity');
 const detectionStateElement = document.getElementById('detectionState');
+const ballDetectedElement = document.getElementById('ballDetected');
+const ballPositionElement = document.getElementById('ballPosition');
+const shotStartTimeElement = document.getElementById('shotStartTime');
+const shotDurationElement = document.getElementById('shotDuration');
 
 let camera = null;
 let lastTime = Date.now();
@@ -39,9 +43,69 @@ const angleHistory = {
 let shotDetected = false;
 let shotCooldown = 0;
 
+// Basketball detection
+let basketballModel = null;
+const basketballHistory = [];
+const MAX_BASKETBALL_HISTORY = 90; // 3 seconds at 30fps
+let shotAnalysisData = null;
+
 // Configuration - focusing on right hand only
 const SHOOTING_HAND = 'right';
 const VELOCITY_THRESHOLD = 300; // degrees per second
+
+// Load YOLO basketball model
+async function loadBasketballModel() {
+    try {
+        // Convert PyTorch model to TensorFlow.js format
+        // For now, we'll simulate basketball detection
+        console.log('Basketball model loading simulated - actual YOLO integration needed');
+        basketballModel = 'loaded'; // Placeholder
+    } catch (error) {
+        console.error('Error loading basketball model:', error);
+    }
+}
+
+// Detect basketball in frame
+function detectBasketball(imageData) {
+    // Placeholder for actual YOLO inference
+    // Returns null or { x, y, confidence }
+    // For testing, we'll simulate detection near the hands
+    if (Math.random() > 0.3) { // 70% detection rate simulation
+        const rightWrist = wristHistory.right[wristHistory.right.length - 1];
+        if (rightWrist) {
+            return {
+                x: rightWrist.x + (Math.random() - 0.5) * 50,
+                y: rightWrist.y - 30 + (Math.random() - 0.5) * 20,
+                confidence: 0.85 + Math.random() * 0.15
+            };
+        }
+    }
+    return null;
+}
+
+// Find the U-shape bottom in basketball trajectory
+function findShotStart(history, releaseTime) {
+    if (history.length < 10) return null;
+    
+    let lowestPoint = null;
+    let lowestY = -Infinity;
+    
+    // Look back up to 3 seconds from release
+    const lookbackTime = releaseTime - 3000;
+    
+    for (let i = history.length - 1; i >= 0; i--) {
+        const point = history[i];
+        if (point.time < lookbackTime) break;
+        
+        // Find the lowest Y point (remember Y increases downward)
+        if (point.y > lowestY) {
+            lowestY = point.y;
+            lowestPoint = point;
+        }
+    }
+    
+    return lowestPoint;
+}
 
 // Initialize MediaPipe Holistic
 const holistic = new Holistic({
@@ -67,6 +131,24 @@ function updateDebugInfo(state) {
     // Update debug panel
     poseDetectedElement.textContent = state.poseDetected ? 'Yes' : 'No';
     poseDetectedElement.className = state.poseDetected ? 'active' : '';
+    
+    ballDetectedElement.textContent = state.ballDetected ? 'Yes' : 'No';
+    ballDetectedElement.className = state.ballDetected ? 'active' : '';
+    
+    if (state.ballPosition) {
+        ballPositionElement.textContent = `x: ${state.ballPosition.x.toFixed(0)}, y: ${state.ballPosition.y.toFixed(0)}`;
+    } else {
+        ballPositionElement.textContent = '-';
+    }
+    
+    // Update shot analysis data if available
+    if (shotAnalysisData) {
+        shotStartTimeElement.textContent = new Date(shotAnalysisData.startTime).toLocaleTimeString();
+        shotDurationElement.textContent = `${shotAnalysisData.duration.toFixed(2)}s`;
+    } else {
+        shotStartTimeElement.textContent = '-';
+        shotDurationElement.textContent = '-';
+    }
     
     past90DegreesElement.textContent = state.past90Degrees ? 'Yes' : 'No';
     past90DegreesElement.className = state.past90Degrees ? 'active' : '';
@@ -94,7 +176,9 @@ function onResults(results) {
         wristAboveShoulder: false,
         currentAngle: null,
         angleVelocity: null,
-        detectionState: 'Idle'
+        detectionState: 'Idle',
+        ballDetected: false,
+        ballPosition: null
     };
 
     // Clear canvas
@@ -103,6 +187,35 @@ function onResults(results) {
     
     // Draw the video
     canvasCtx.drawImage(results.image, 0, 0, canvasElement.width, canvasElement.height);
+    
+    // Detect basketball
+    const ballDetection = detectBasketball(results.image);
+    if (ballDetection) {
+        debugState.ballDetected = true;
+        debugState.ballPosition = ballDetection;
+        
+        // Add to history
+        basketballHistory.push({
+            x: ballDetection.x,
+            y: ballDetection.y,
+            confidence: ballDetection.confidence,
+            time: currentTime
+        });
+        
+        // Keep history limited to 3 seconds
+        while (basketballHistory.length > MAX_BASKETBALL_HISTORY) {
+            basketballHistory.shift();
+        }
+        
+        // Draw basketball marker
+        canvasCtx.save();
+        canvasCtx.strokeStyle = '#FFA500';
+        canvasCtx.lineWidth = 3;
+        canvasCtx.beginPath();
+        canvasCtx.arc(ballDetection.x, ballDetection.y, 15, 0, 2 * Math.PI);
+        canvasCtx.stroke();
+        canvasCtx.restore();
+    }
 
     if (results.poseLandmarks) {
         debugState.poseDetected = true;
@@ -235,6 +348,21 @@ function onResults(results) {
                     console.log(`SHOT DETECTED! Forward flick detected`);
                     console.log(`  Angle: ${previous.angle.toFixed(1)}° → ${recent.angle.toFixed(1)}°`);
                     console.log(`  Velocity: ${angularVelocity.toFixed(0)}°/s`);
+                    
+                    // Analyze shot start using basketball trajectory
+                    const shotStart = findShotStart(basketballHistory, currentTime);
+                    if (shotStart) {
+                        const shotDuration = (currentTime - shotStart.time) / 1000; // in seconds
+                        shotAnalysisData = {
+                            startTime: shotStart.time,
+                            releaseTime: currentTime,
+                            duration: shotDuration,
+                            startPosition: { x: shotStart.x, y: shotStart.y }
+                        };
+                        console.log(`  Shot duration: ${shotDuration.toFixed(2)}s`);
+                        console.log(`  Start position: (${shotStart.x.toFixed(0)}, ${shotStart.y.toFixed(0)})`);
+                    }
+                    
                     triggerShotDetection();
                 }
             }
@@ -246,6 +374,11 @@ function onResults(results) {
 
     // Update debug info
     updateDebugInfo(debugState);
+    
+    // Draw basketball trajectory if we have recent shot data
+    if (shotAnalysisData && (currentTime - shotAnalysisData.releaseTime) < 3000) {
+        drawBasketballTrajectory();
+    }
 
     // Decrease cooldown
     if (shotCooldown > 0) {
@@ -299,6 +432,51 @@ function drawWrist(position, color, label) {
     canvasCtx.textBaseline = 'middle';
     canvasCtx.fillText(label, position.x, position.y);
 
+    canvasCtx.restore();
+}
+
+function drawBasketballTrajectory() {
+    if (!shotAnalysisData || basketballHistory.length < 2) return;
+    
+    canvasCtx.save();
+    canvasCtx.strokeStyle = '#FFA500';
+    canvasCtx.lineWidth = 2;
+    canvasCtx.setLineDash([5, 5]);
+    
+    // Draw trajectory from shot start to current
+    canvasCtx.beginPath();
+    let started = false;
+    
+    for (let i = 0; i < basketballHistory.length; i++) {
+        const point = basketballHistory[i];
+        if (point.time >= shotAnalysisData.startTime) {
+            if (!started) {
+                canvasCtx.moveTo(point.x, point.y);
+                started = true;
+            } else {
+                canvasCtx.lineTo(point.x, point.y);
+            }
+        }
+    }
+    
+    canvasCtx.stroke();
+    
+    // Mark shot start point with a special marker
+    if (shotAnalysisData.startPosition) {
+        canvasCtx.fillStyle = '#FF0000';
+        canvasCtx.strokeStyle = '#FF0000';
+        canvasCtx.lineWidth = 3;
+        canvasCtx.setLineDash([]);
+        
+        // Draw a star at start position
+        canvasCtx.beginPath();
+        canvasCtx.arc(shotAnalysisData.startPosition.x, shotAnalysisData.startPosition.y, 8, 0, 2 * Math.PI);
+        canvasCtx.fill();
+        
+        canvasCtx.font = 'bold 14px Arial';
+        canvasCtx.fillText('START', shotAnalysisData.startPosition.x + 10, shotAnalysisData.startPosition.y - 10);
+    }
+    
     canvasCtx.restore();
 }
 
@@ -364,8 +542,12 @@ startBtn.addEventListener('click', async () => {
     canvasElement.width = videoElement.videoWidth || 1280;
     canvasElement.height = videoElement.videoHeight || 720;
     
+    // Load basketball detection model
+    await loadBasketballModel();
+    
     console.log('MediaPipe Holistic initialized - tracking with index finger');
     console.log('Detection requires: 1) Wrist above shoulder, 2) Angle > -90°, 3) Velocity > 300°/s');
+    console.log('Basketball detection enabled for shot analysis');
 });
 
 stopBtn.addEventListener('click', () => {
@@ -392,6 +574,12 @@ stopBtn.addEventListener('click', () => {
         wristAboveShoulder: false,
         currentAngle: null,
         angleVelocity: null,
-        detectionState: 'Stopped'
+        detectionState: 'Stopped',
+        ballDetected: false,
+        ballPosition: null
     });
+    
+    // Clear basketball history
+    basketballHistory.length = 0;
+    shotAnalysisData = null;
 });
