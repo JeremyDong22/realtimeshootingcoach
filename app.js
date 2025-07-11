@@ -186,8 +186,8 @@ function onResults(results) {
             const angle = Math.atan2(dy, dx) * 180 / Math.PI;
             
             debugState.currentAngle = angle;
-            // For right hand, past vertical means angle < 90 (forward release position)
-            debugState.past90Degrees = angle < 90;
+            // For right hand, past vertical upward means angle between -90° and 0°
+            debugState.past90Degrees = angle > -90 && angle < 0;
             
             // Add to angle history
             angleHistory.right.push({ 
@@ -217,8 +217,9 @@ function onResults(results) {
                 wristSpeedElement.textContent = `${angularVelocity.toFixed(0)}°/s`;
                 
                 // Check for forward shooting motion
-                // For right hand: angle should progress from >90° (cocked back) to <90° (forward release)
-                const isForwardMotion = angleDiff < 0 && recent.angle < 90 && previous.angle > 90;
+                // For right hand: angle should progress from <-90° (cocked back) to >-90° (forward release)
+                // Example: -100° → -90° → -80° (passing through vertical upward)
+                const isForwardMotion = angleDiff > 0 && recent.angle > -90 && previous.angle < -90;
                 
                 // Check all conditions for shot detection
                 if (shotCooldown === 0 &&
