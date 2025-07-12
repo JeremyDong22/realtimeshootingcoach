@@ -44,16 +44,43 @@ window.initializeMediaPipeTraining = async function(container, onShotDetected) {
         onPoseResults(results, canvasElement, canvasCtx);
     });
     
-    // Initialize camera
-    camera = new Camera(videoElement, {
-        onFrame: async () => {
-            await poseInstance.send({ image: videoElement });
-        },
-        width: 1280,
-        height: 720
-    });
-    
-    camera.start();
+    // Initialize camera with permission handling
+    try {
+        // First check if we can access camera
+        const stream = await navigator.mediaDevices.getUserMedia({ 
+            video: { 
+                width: { ideal: 1280 },
+                height: { ideal: 720 },
+                facingMode: 'user'
+            } 
+        });
+        
+        // Stop the test stream
+        stream.getTracks().forEach(track => track.stop());
+        
+        // Now initialize the MediaPipe camera
+        camera = new Camera(videoElement, {
+            onFrame: async () => {
+                await poseInstance.send({ image: videoElement });
+            },
+            width: 1280,
+            height: 720
+        });
+        
+        camera.start();
+    } catch (error) {
+        console.error('Camera access error:', error);
+        container.innerHTML = `
+            <div style="text-align: center; padding: 40px; color: #666;">
+                <h3>Camera Access Required</h3>
+                <p>${error.name === 'NotAllowedError' ? 
+                    'Please allow camera access to use the training feature.' : 
+                    'Camera not available. Please check your device settings.'}</p>
+                <button class="btn btn-primary" onclick="location.reload()">Try Again</button>
+            </div>
+        `;
+        throw error;
+    }
     
     // Add start/stop button
     const controlBtn = document.createElement('button');

@@ -1,0 +1,61 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Icon Generator</title>
+</head>
+<body>
+    <h2>PWA Icon Generator</h2>
+    <canvas id="canvas"></canvas>
+    <script>
+        const sizes = [72, 96, 128, 144, 152, 192, 384, 512];
+        
+        sizes.forEach(size => {
+            const canvas = document.createElement('canvas');
+            canvas.width = size;
+            canvas.height = size;
+            const ctx = canvas.getContext('2d');
+            
+            // Background
+            ctx.fillStyle = '#FAFAFA';
+            ctx.fillRect(0, 0, size, size);
+            
+            // Basketball circle
+            ctx.strokeStyle = '#1A1A1A';
+            ctx.lineWidth = size / 50;
+            ctx.beginPath();
+            ctx.arc(size/2, size/2, size/3, 0, 2 * Math.PI);
+            ctx.stroke();
+            
+            // Basketball lines
+            ctx.beginPath();
+            ctx.moveTo(size/2, size/6);
+            ctx.lineTo(size/2, size*5/6);
+            ctx.stroke();
+            
+            ctx.beginPath();
+            ctx.moveTo(size/6, size/2);
+            ctx.lineTo(size*5/6, size/2);
+            ctx.stroke();
+            
+            // Curved lines
+            ctx.beginPath();
+            ctx.arc(size/2, size/2, size/3, -Math.PI/4, Math.PI/4);
+            ctx.stroke();
+            
+            ctx.beginPath();
+            ctx.arc(size/2, size/2, size/3, Math.PI*3/4, Math.PI*5/4);
+            ctx.stroke();
+            
+            // Download link
+            const link = document.createElement('a');
+            link.download = `icon-${size}x${size}.png`;
+            link.href = canvas.toDataURL();
+            link.textContent = `Download ${size}x${size}`;
+            link.style.display = 'block';
+            link.style.margin = '10px';
+            document.body.appendChild(link);
+            document.body.appendChild(canvas);
+        });
+    </script>
+</body>
+</html>

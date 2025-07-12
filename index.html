@@ -4,9 +4,10 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
     <title>Shooting Coach - AI Basketball Training</title>
-    <link rel="manifest" href="/manifest.json">
+    <link rel="manifest" href="./manifest.json">
     <link rel="stylesheet" href="styles.css">
     <meta name="theme-color" content="#000000">
+    <meta name="mobile-web-app-capable" content="yes">
     <meta name="apple-mobile-web-app-capable" content="yes">
     <meta name="apple-mobile-web-app-status-bar-style" content="default">
 </head>
@@ -238,11 +239,11 @@
                 <form id="authForm" onsubmit="handleAuth(event)">
                     <div class="form-group">
                         <label class="form-label">Email</label>
-                        <input type="email" class="form-input" id="authEmail" required>
+                        <input type="email" class="form-input" id="authEmail" autocomplete="email" required>
                     </div>
                     <div class="form-group">
                         <label class="form-label">Password</label>
-                        <input type="password" class="form-input" id="authPassword" required>
+                        <input type="password" class="form-input" id="authPassword" autocomplete="current-password" required>
                     </div>
                     <button type="submit" class="btn btn-primary" style="width: 100%;">Continue</button>
                     <button type="button" class="btn btn-secondary mt-2" style="width: 100%;" onclick="closeAuth()">Cancel</button>

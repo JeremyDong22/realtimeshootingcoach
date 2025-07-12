@@ -1,10 +1,15 @@
 // PWA Service Worker Registration
-if ('serviceWorker' in navigator) {
+if ('serviceWorker' in navigator && window.location.protocol === 'https:') {
     window.addEventListener('load', () => {
-        navigator.serviceWorker.register('/service-worker.js')
+        navigator.serviceWorker.register('./service-worker.js')
             .then(registration => console.log('ServiceWorker registered'))
-            .catch(err => console.log('ServiceWorker registration failed: ', err));
+            .catch(err => {
+                console.log('ServiceWorker registration failed: ', err);
+                // Continue app without service worker
+            });
     });
+} else if (window.location.protocol !== 'https:') {
+    console.log('Service Worker requires HTTPS. App will work without offline support.');
 }
 
 // App State
@@ -122,8 +127,14 @@ async function initializeTraining() {
         return;
     }
     
-    // Create loading indicator
-    container.innerHTML = '<div class="loading"></div>';
+    // Show loading with message
+    container.innerHTML = `
+        <div style="text-align: center; padding: 40px;">
+            <div class="loading"></div>
+            <p style="margin-top: 20px; color: #666;">Initializing camera...</p>
+            <p style="margin-top: 10px; color: #999; font-size: 14px;">You may need to allow camera access</p>
+        </div>
+    `;
     
     // Load the training interface
     try {
@@ -149,7 +160,7 @@ async function loadTrainingScripts() {
         await loadScript('https://cdn.jsdelivr.net/npm/@mediapipe/pose/pose.js');
         await loadScript('https://cdn.jsdelivr.net/npm/@mediapipe/camera_utils/camera_utils.js');
         await loadScript('https://cdn.jsdelivr.net/npm/@mediapipe/drawing_utils/drawing_utils.js');
-        await loadScript('training-integration.js');
+        await loadScript('./training-integration.js');
     }
 }
 
