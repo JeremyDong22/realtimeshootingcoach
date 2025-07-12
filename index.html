@@ -44,14 +44,68 @@
                 </svg>
 
                 <div class="auth-buttons">
-                    <button class="btn btn-secondary" onclick="showAuth('login')">Log In</button>
-                    <button class="btn btn-primary" onclick="showAuth('signup')">Sign Up</button>
+                    <button class="btn btn-secondary" onclick="navigateTo('login')">Log In</button>
+                    <button class="btn btn-primary" onclick="navigateTo('signup')">Sign Up</button>
                 </div>
             </div>
 
             <div class="credits">
                 <p>Powered by MediaPipe</p>
                 <p>Made by Jeremy Dong</p>
+            </div>
+        </div>
+
+        <!-- Login Page -->
+        <div id="loginPage" class="page auth-page">
+            <div class="auth-container">
+                <h1 class="auth-title">Welcome Back</h1>
+                <p class="auth-subtitle">Log in to continue your training</p>
+                
+                <form class="auth-form" onsubmit="handleLogin(event)">
+                    <div class="form-group">
+                        <label class="form-label">Email</label>
+                        <input type="email" class="form-input" id="loginEmail" autocomplete="email" required>
+                    </div>
+                    <div class="form-group">
+                        <label class="form-label">Password</label>
+                        <input type="password" class="form-input" id="loginPassword" autocomplete="current-password" required>
+                    </div>
+                    <button type="submit" class="btn btn-primary" style="width: 100%; margin-top: 24px;">Log In</button>
+                </form>
+                
+                <div class="auth-footer">
+                    <p>Don't have an account? <a href="#" onclick="navigateTo('signup'); return false;">Sign up</a></p>
+                    <p><a href="#" onclick="navigateTo('index'); return false;">Back to home</a></p>
+                </div>
+            </div>
+        </div>
+
+        <!-- Signup Page -->
+        <div id="signupPage" class="page auth-page">
+            <div class="auth-container">
+                <h1 class="auth-title">Join Shooting Coach</h1>
+                <p class="auth-subtitle">Start your basketball training journey</p>
+                
+                <form class="auth-form" onsubmit="handleSignup(event)">
+                    <div class="form-group">
+                        <label class="form-label">Name</label>
+                        <input type="text" class="form-input" id="signupName" autocomplete="name" required>
+                    </div>
+                    <div class="form-group">
+                        <label class="form-label">Email</label>
+                        <input type="email" class="form-input" id="signupEmail" autocomplete="email" required>
+                    </div>
+                    <div class="form-group">
+                        <label class="form-label">Password</label>
+                        <input type="password" class="form-input" id="signupPassword" autocomplete="new-password" required>
+                    </div>
+                    <button type="submit" class="btn btn-primary" style="width: 100%; margin-top: 24px;">Sign Up</button>
+                </form>
+                
+                <div class="auth-footer">
+                    <p>Already have an account? <a href="#" onclick="navigateTo('login'); return false;">Log in</a></p>
+                    <p><a href="#" onclick="navigateTo('index'); return false;">Back to home</a></p>
+                </div>
             </div>
         </div>
 
@@ -189,6 +243,7 @@
                         <option value="left">Left</option>
                     </select>
                 </div>
+                <button class="btn btn-secondary" onclick="logout()" style="width: 100%; margin-top: 32px;">Log Out</button>
             </div>
         </div>
 
@@ -232,24 +287,6 @@
             </div>
         </nav>
 
-        <!-- Auth Modal -->
-        <div id="authModal" class="modal">
-            <div class="modal-content">
-                <h2 class="modal-header" id="authTitle">Log In</h2>
-                <form id="authForm" onsubmit="handleAuth(event)">
-                    <div class="form-group">
-                        <label class="form-label">Email</label>
-                        <input type="email" class="form-input" id="authEmail" autocomplete="email" required>
-                    </div>
-                    <div class="form-group">
-                        <label class="form-label">Password</label>
-                        <input type="password" class="form-input" id="authPassword" autocomplete="current-password" required>
-                    </div>
-                    <button type="submit" class="btn btn-primary" style="width: 100%;">Continue</button>
-                    <button type="button" class="btn btn-secondary mt-2" style="width: 100%;" onclick="closeAuth()">Cancel</button>
-                </form>
-            </div>
-        </div>
     </div>
 
     <script src="app-navigation.js"></script>

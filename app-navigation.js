@@ -53,8 +53,8 @@ function navigateTo(page) {
             navItems[2].classList.add('active');
         }
         
-        // Hide nav bar on index page
-        if (page === 'index') {
+        // Hide nav bar on index, login, and signup pages
+        if (page === 'index' || page === 'login' || page === 'signup') {
             document.getElementById('navBar').style.display = 'none';
         } else {
             document.getElementById('navBar').style.display = 'flex';
@@ -68,21 +68,10 @@ function navigateTo(page) {
 }
 
 // Auth Functions
-function showAuth(type) {
-    const modal = document.getElementById('authModal');
-    const title = document.getElementById('authTitle');
-    title.textContent = type === 'login' ? 'Log In' : 'Sign Up';
-    modal.classList.add('active');
-}
-
-function closeAuth() {
-    document.getElementById('authModal').classList.remove('active');
-}
-
-function handleAuth(event) {
+function handleLogin(event) {
     event.preventDefault();
-    const email = document.getElementById('authEmail').value;
-    const password = document.getElementById('authPassword').value;
+    const email = document.getElementById('loginEmail').value;
+    const password = document.getElementById('loginPassword').value;
     
     // Simulate authentication (replace with real auth later)
     appState.isAuthenticated = true;
@@ -91,7 +80,22 @@ function handleAuth(event) {
     // Store in localStorage
     localStorage.setItem('shootingCoachAuth', JSON.stringify({ email }));
     
-    closeAuth();
+    showHomePage();
+}
+
+function handleSignup(event) {
+    event.preventDefault();
+    const name = document.getElementById('signupName').value;
+    const email = document.getElementById('signupEmail').value;
+    const password = document.getElementById('signupPassword').value;
+    
+    // Simulate authentication (replace with real auth later)
+    appState.isAuthenticated = true;
+    appState.user = { email, name };
+    
+    // Store in localStorage
+    localStorage.setItem('shootingCoachAuth', JSON.stringify({ email, name }));
+    
     showHomePage();
 }
 
@@ -279,10 +283,10 @@ window.addEventListener('DOMContentLoaded', () => {
     }
 });
 
-// Close modal on outside click
-window.addEventListener('click', (event) => {
-    const modal = document.getElementById('authModal');
-    if (event.target === modal) {
-        closeAuth();
-    }
-});
+// Add logout function
+function logout() {
+    appState.isAuthenticated = false;
+    appState.user = null;
+    localStorage.removeItem('shootingCoachAuth');
+    navigateTo('index');
+}
