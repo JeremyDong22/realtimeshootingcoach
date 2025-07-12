@@ -267,20 +267,29 @@ function updateHeatmapVisualization() {
     });
 }
 
-// Check for existing auth on load
+// Initialize app on load
 window.addEventListener('DOMContentLoaded', () => {
-    // Ensure only index page is visible initially
+    // Always start at index page
     document.querySelectorAll('.page').forEach(p => p.classList.remove('active'));
     document.getElementById('indexPage').classList.add('active');
     document.getElementById('navBar').style.display = 'none';
     
-    // Check for saved auth
+    // Option 1: Always require login (current implementation)
+    localStorage.removeItem('shootingCoachAuth');
+    appState.isAuthenticated = false;
+    appState.user = null;
+    
+    // Option 2: Keep user logged in but still show index first
+    // Uncomment below and comment out Option 1 if you prefer this
+    /*
     const savedAuth = localStorage.getItem('shootingCoachAuth');
     if (savedAuth) {
         appState.isAuthenticated = true;
         appState.user = JSON.parse(savedAuth);
-        showHomePage();
+        // User is logged in but still sees index page first
+        // They can click login and will go straight to home
     }
+    */
 });
 
 // Add logout function
@@ -289,4 +298,14 @@ function logout() {
     appState.user = null;
     localStorage.removeItem('shootingCoachAuth');
     navigateTo('index');
+}
+
+// Handle login button from index page
+function handleIndexLogin() {
+    // If already logged in (from previous session), go straight to home
+    if (appState.isAuthenticated) {
+        showHomePage();
+    } else {
+        navigateTo('login');
+    }
 }
