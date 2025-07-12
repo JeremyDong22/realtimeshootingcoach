@@ -42,10 +42,18 @@ body {
 }
 
 .page {
-  flex: 1;
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  width: 100%;
+  min-height: 100vh;
   padding: 20px;
   padding-bottom: 80px; /* Space for nav bar */
   display: none;
+  background-color: var(--bg-primary);
+  overflow-y: auto;
 }
 
 .page.active {
@@ -60,6 +68,8 @@ body {
   align-items: center;
   padding: 40px 20px;
   text-align: center;
+  min-height: 100vh;
+  padding-bottom: 20px; /* No nav bar on index */
 }
 
 .basketball-icon {
@@ -347,6 +357,21 @@ body {
 
 @keyframes spin {
   to { transform: rotate(360deg); }
+}
+
+/* Page header */
+.page-title {
+  font-size: 28px;
+  font-weight: 700;
+  margin-bottom: 24px;
+  color: var(--text-primary);
+}
+
+/* Empty state */
+.empty-state {
+  text-align: center;
+  padding: 60px 20px;
+  color: var(--text-secondary);
 }
 
 /* Utility classes */

@@ -47,6 +47,19 @@ function navigateTo(page) {
             navItems[pageIndex].classList.add('active');
         }
         
+        // Set home as default active when on home page
+        if (page === 'home') {
+            // Home doesn't have a nav item, so default to training
+            navItems[2].classList.add('active');
+        }
+        
+        // Hide nav bar on index page
+        if (page === 'index') {
+            document.getElementById('navBar').style.display = 'none';
+        } else {
+            document.getElementById('navBar').style.display = 'flex';
+        }
+        
         // Special handling for training page
         if (page === 'training') {
             initializeTraining();
@@ -83,7 +96,13 @@ function handleAuth(event) {
 }
 
 function showHomePage() {
+    // Hide index page completely
+    document.getElementById('indexPage').classList.remove('active');
+    
+    // Show navigation bar
     document.getElementById('navBar').style.display = 'flex';
+    
+    // Navigate to home page
     navigateTo('home');
     updateStats();
 }
@@ -246,6 +265,12 @@ function updateHeatmapVisualization() {
 
 // Check for existing auth on load
 window.addEventListener('DOMContentLoaded', () => {
+    // Ensure only index page is visible initially
+    document.querySelectorAll('.page').forEach(p => p.classList.remove('active'));
+    document.getElementById('indexPage').classList.add('active');
+    document.getElementById('navBar').style.display = 'none';
+    
+    // Check for saved auth
     const savedAuth = localStorage.getItem('shootingCoachAuth');
     if (savedAuth) {
         appState.isAuthenticated = true;
