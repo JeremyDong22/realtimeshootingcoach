@@ -5,12 +5,17 @@ const fs = require('fs');
 const path = require('path');
 
 // Read environment variables
-const VITE_SUPABASE_URL = process.env.VITE_SUPABASE_URL || 'https://wdpeoyugsxqnpwwtkqsl.supabase.co';
-const VITE_SUPABASE_ANON_KEY = process.env.VITE_SUPABASE_ANON_KEY || 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6IndkcGVveXVnc3hxbnB3d3RrcXNsIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NDQxNDgwNzgsImV4cCI6MjA1OTcyNDA3OH0.9bUpuZCOZxDSH3KsIu6FwWZyAvnV5xPJGNpO3luxWOE';
+const VITE_SUPABASE_URL = process.env.VITE_SUPABASE_URL;
+const VITE_SUPABASE_ANON_KEY = process.env.VITE_SUPABASE_ANON_KEY;
 
 if (!VITE_SUPABASE_URL || !VITE_SUPABASE_ANON_KEY) {
   console.error('Error: Missing required environment variables');
   console.error('Please set VITE_SUPABASE_URL and VITE_SUPABASE_ANON_KEY');
+  console.error('');
+  console.error('For Vercel deployment:');
+  console.error('1. Go to your Vercel project settings');
+  console.error('2. Navigate to Environment Variables');
+  console.error('3. Add these variables for all environments');
   process.exit(1);
 }
 
