@@ -7,8 +7,8 @@
 const translations = {
     zh: {
         // Landing page
-        appTitle: "投篮教练",
-        appSubtitle: "精英篮球训练",
+        appTitle: "Shoot It",
+        appSubtitle: "你的AI投篮教练",
         login: "登录",
         signup: "注册",
         yourName: "您的姓名",
@@ -90,7 +90,7 @@ const translations = {
         rightHand: "右手",
         leftHand: "左手",
         logout: "退出登录",
-        version: "投篮教练精英版 v2.0",
+        version: "Shoot It v2.0",
         poweredBy: "由 MediaPipe 提供支持",
         
         // Replays
@@ -155,8 +155,8 @@ const translations = {
     
     en: {
         // Landing page
-        appTitle: "Shooting Coach",
-        appSubtitle: "Elite Basketball Training",
+        appTitle: "Shoot It",
+        appSubtitle: "Your AI Shooting Coach",
         login: "Log In",
         signup: "Sign Up",
         yourName: "Your name",
@@ -238,7 +238,7 @@ const translations = {
         rightHand: "Right Hand",
         leftHand: "Left Hand",
         logout: "Log Out",
-        version: "Shooting Coach Elite v2.0",
+        version: "Shoot It v2.0",
         poweredBy: "Powered by MediaPipe",
         
         // Replays
