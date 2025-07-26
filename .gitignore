@@ -3,6 +3,9 @@
 .env.local
 .env.production
 
+# Generated files
+assets/js/supabase-config.js
+
 # Python
 venv/
 __pycache__/
@@ -22,3 +25,14 @@ Thumbs.db
 
 # Logs
 *.log
+
+# Node modules (if added later)
+node_modules/
+
+# Build output
+dist/
+build/
+
+# Misc
+*.zip
+.vercel

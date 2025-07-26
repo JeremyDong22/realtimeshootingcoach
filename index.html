@@ -3,17 +3,19 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
-    <title>投篮教练 - 篮球训练</title>
-    <link rel="stylesheet" href="styles.css?v=3.0">
+    <title>Shoot-it 你的AI投篮教练</title>
+    <link rel="stylesheet" href="assets/css/styles.css?v=3.0">
     <link rel="manifest" href="manifest.json">
-    <link rel="apple-touch-icon" href="/apple-touch-icon.png">
-    <link rel="icon" href="/favicon.ico" type="image/x-icon">
+    <link rel="apple-touch-icon" sizes="180x180" href="/assets/icons/apple-touch-icon.png">
+    <link rel="icon" type="image/png" sizes="32x32" href="/assets/icons/favicon-32x32.png">
+    <link rel="icon" type="image/png" sizes="16x16" href="/assets/icons/favicon-16x16.png">
+    <link rel="icon" href="/assets/icons/favicon.ico" type="image/x-icon">
     <meta name="theme-color" content="#0A0A0A">
     <meta name="apple-mobile-web-app-capable" content="yes">
     <meta name="mobile-web-app-capable" content="yes">
     <meta name="apple-mobile-web-app-status-bar-style" content="black">
-    <meta name="apple-mobile-web-app-title" content="投篮教练">
-    <meta name="application-name" content="投篮教练">
+    <meta name="apple-mobile-web-app-title" content="Shoot-it">
+    <meta name="application-name" content="Shoot-it">
 </head>
 <body>
     <div id="app">
@@ -33,8 +35,8 @@
                     </div>
                 </div>
                 
-                <h1 class="app-title" data-i18n="appTitle">投篮教练</h1>
-                <p class="app-subtitle" data-i18n="appSubtitle">精英篮球训练</p>
+                <h1 class="app-title" data-i18n="appTitle">Shoot-It</h1>
+                <p class="app-subtitle" data-i18n="appSubtitle">你的AI投篮教练</p>
                 
                 <div class="auth-form-wrapper">
                     <div class="auth-toggle">
@@ -608,7 +610,7 @@
                 </div>
                 
                 <div class="text-center mt-lg">
-                    <p style="color: var(--text-tertiary); font-size: var(--font-sm);" data-i18n="version">投篮教练精英版 v2.0</p>
+                    <p style="color: var(--text-tertiary); font-size: var(--font-sm);" data-i18n="version">Shoot-It v2.0</p>
                     <p style="color: var(--text-tertiary); font-size: var(--font-sm);" data-i18n="poweredBy">由 MediaPipe 提供支持</p>
                 </div>
             </div>
@@ -665,8 +667,7 @@
     <!-- Supabase SDK -->
     <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
     
-    <!-- Camera Fix for PWA -->
-    <script src="pwa-camera-fix.js"></script>
+    <!-- Camera Fix for PWA (removed - file not found) -->
     
     <!-- MediaPipe Scripts -->
     <script src="https://cdn.jsdelivr.net/npm/@mediapipe/camera_utils/camera_utils.js"></script>
@@ -675,12 +676,12 @@
     <script src="https://cdn.jsdelivr.net/npm/@mediapipe/pose/pose.js"></script>
     
     <!-- App Scripts -->
-    <script src="camera-helper.js"></script>
-    <script type="module" src="app-navigation.js?v=4.0" defer></script>
-    <script type="module" src="i18n.js" defer></script>
-    <script src="batch-selection.js" defer></script>
-    <link rel="stylesheet" href="pwa-installer.css">
-    <script src="pwa-installer.js" defer></script>
+    <!-- Camera Helper (removed - file not found) -->
+    <script type="module" src="assets/js/app-navigation.js?v=4.0" defer></script>
+    <script type="module" src="assets/js/i18n.js" defer></script>
+    <script src="assets/js/batch-selection.js" defer></script>
+    <link rel="stylesheet" href="assets/css/pwa-installer.css">
+    <script src="assets/js/pwa-installer.js" defer></script>
     
     <!-- Service Worker Registration -->
     <script>

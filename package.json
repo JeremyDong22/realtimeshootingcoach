@@ -1,0 +1,23 @@
+{
+  "name": "shootingcoach",
+  "version": "2.0.0",
+  "description": "投篮教练专业版 - 篮球训练应用",
+  "main": "index.html",
+  "scripts": {
+    "build": "node build.js",
+    "start": "npm run build && npx serve -l 8000",
+    "dev": "npm run build && npx serve -l 8000",
+    "serve": "npx serve -l 8000"
+  },
+  "keywords": [
+    "basketball",
+    "training",
+    "pwa",
+    "shooting"
+  ],
+  "author": "ShootingCoach Team",
+  "license": "MIT",
+  "engines": {
+    "node": ">=14.0.0"
+  }
+}

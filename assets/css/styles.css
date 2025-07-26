@@ -3098,11 +3098,13 @@ button:disabled {
 
 .countdown-content {
     position: fixed;
-    right: var(--space-sm);
+    left: 50%;
     top: 50%;
-    transform: translateY(-50%);
+    transform: translate(-50%, -50%);
     display: flex;
     flex-direction: column;
+    align-items: center;
+    justify-content: center;
     gap: var(--space-xs);
     pointer-events: auto;
 }
@@ -3158,14 +3160,15 @@ button:disabled {
 }
 
 .countdown-number {
-    font-size: clamp(80px, 15vw, 120px);
+    font-size: clamp(100px, 20vw, 160px);
     font-weight: 900;
     color: white;
     background: rgba(0, 0, 0, 0.8);
-    padding: var(--space-xl);
-    border-radius: var(--radius-xl);
-    min-width: 120px;
-    text-shadow: 0 0 20px rgba(255, 107, 53, 0.5);
+    padding: var(--space-2xl);
+    border-radius: var(--radius-2xl);
+    min-width: 200px;
+    text-align: center;
+    text-shadow: 0 0 30px rgba(255, 107, 53, 0.8);
     animation: countdownPulse 1s ease-out;
     line-height: 1;
 }

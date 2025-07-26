@@ -1,10 +1,21 @@
-const CACHE_NAME = 'shooting-coach-v1';
+const CACHE_NAME = 'shooting-coach-v2';
 const urlsToCache = [
   '/',
-  '/styles.css',
-  '/app-navigation.js',
+  '/index.html',
   '/manifest.json',
-  '/index.html'
+  '/assets/css/styles.css',
+  '/assets/css/pwa-installer.css',
+  '/assets/js/app-navigation.js',
+  '/assets/js/simple-auth.js',
+  '/assets/js/supabase-client.js',
+  '/assets/js/supabase-config.js',
+  '/assets/js/i18n.js',
+  '/assets/js/batch-selection.js',
+  '/assets/js/pwa-installer.js',
+  '/assets/icons/android-chrome-192x192.png',
+  '/assets/icons/android-chrome-512x512.png',
+  '/assets/icons/apple-touch-icon.png',
+  '/assets/icons/favicon.ico'
 ];
 
 // Install event - cache resources

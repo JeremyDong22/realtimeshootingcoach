@@ -847,7 +847,12 @@ async function initializeMediaPipe() {
         
         state.pose.onResults(onPoseResults);
         
-        // Initialize the pose model
+        // Initialize the pose model with performance optimization
+        // Show loading indicator
+        document.getElementById('trainingStatus').textContent = getCurrentLanguage() === 'zh' ? 
+            '正在初始化姿势检测...' : 'Initializing pose detection...';
+        
+        // Initialize pose asynchronously to avoid blocking
         await state.pose.initialize();
         
         // Initialize Camera
@@ -1017,7 +1022,7 @@ function startDebugPanel() {
         frameCount++;
         const now = Date.now();
         if (now - lastTime >= 1000) {
-            document.getElementById('debugFPS').textContent = frameCount;
+            // Debug FPS removed for performance
             frameCount = 0;
             lastTime = now;
         }
@@ -1032,8 +1037,18 @@ function startDebugPanel() {
 
 // Pose Results Handler
 let poseFrameCount = 0;
+let lastProcessTime = 0;
+const PROCESS_INTERVAL = 50; // Process every 50ms (20 FPS) for better performance
+
 function onPoseResults(results) {
     try {
+        // Throttle processing to improve performance
+        const now = Date.now();
+        if (now - lastProcessTime < PROCESS_INTERVAL) {
+            return;
+        }
+        lastProcessTime = now;
+        
         const canvas = document.getElementById('canvas');
         const ctx = canvas.getContext('2d', { willReadFrequently: true });
         const video = document.getElementById('video');
@@ -1045,7 +1060,7 @@ function onPoseResults(results) {
             state.canvasSizeSet = true;
         }
     
-    // Debug logging disabled
+    // Simple logging only
     poseFrameCount++;
     
     // Clear canvas
@@ -1068,42 +1083,7 @@ function onPoseResults(results) {
             const x = wrist.x * canvas.width;
             const y = wrist.y * canvas.height;
             
-            // Add to wrist trail
-            if (!state.wristTrail) state.wristTrail = [];
-            state.wristTrail.push({ x, y, time: Date.now() });
-            
-            // Keep trail limited to last 15 points for performance
-            if (state.wristTrail.length > 15) state.wristTrail.shift();
-            
-            // Draw trail with optimized rendering
-            if (state.wristTrail.length > 1) {
-                ctx.save();
-                ctx.strokeStyle = '#FF6B35';
-                ctx.lineWidth = 6;
-                ctx.lineCap = 'round';
-                ctx.lineJoin = 'round';
-                
-                // Draw entire trail in one path for better performance
-                ctx.beginPath();
-                ctx.moveTo(state.wristTrail[0].x, state.wristTrail[0].y);
-                
-                for (let i = 1; i < state.wristTrail.length; i++) {
-                    ctx.lineTo(state.wristTrail[i].x, state.wristTrail[i].y);
-                }
-                
-                // Apply gradient effect
-                const gradient = ctx.createLinearGradient(
-                    state.wristTrail[0].x, state.wristTrail[0].y,
-                    state.wristTrail[state.wristTrail.length - 1].x,
-                    state.wristTrail[state.wristTrail.length - 1].y
-                );
-                gradient.addColorStop(0, 'rgba(255, 107, 53, 0.2)');
-                gradient.addColorStop(1, 'rgba(255, 107, 53, 0.8)');
-                ctx.strokeStyle = gradient;
-                
-                ctx.stroke();
-                ctx.restore();
-            }
+            // Simplified - no trail, just the wrist point
             
             // Draw wrist point in orange
             drawLandmarks(ctx, [wrist], {
@@ -1113,45 +1093,7 @@ function onPoseResults(results) {
                 radius: 8 // Larger
             });
         }
-        // Track joint detection during active shooting
-        if (state.shotDetection.isCountdownComplete && state.isTraining) {
-            // Check if all joints are visible during active shooting
-            const jointChecks = {
-                ankle: results.poseLandmarks[28], // Right ankle
-                knee: results.poseLandmarks[26],  // Right knee
-                hip: results.poseLandmarks[24],   // Right hip
-                shoulder: results.poseLandmarks[12], // Right shoulder
-                elbow: results.poseLandmarks[14],  // Right elbow
-                wrist: results.poseLandmarks[16]   // Right wrist
-            };
-            
-            let bodyDetected = true;
-            for (const [joint, landmark] of Object.entries(jointChecks)) {
-                if (!landmark || landmark.visibility < 0.5) {
-                    bodyDetected = false;
-                    break;
-                }
-            }
-            
-            const currentTime = Date.now();
-            
-            if (bodyDetected) {
-                // Reset tracking when body is detected
-                state.jointTracking.bodyNotDetectedTime = null;
-            } else {
-                // Body not detected
-                if (!state.jointTracking.bodyNotDetectedTime) {
-                    state.jointTracking.bodyNotDetectedTime = currentTime;
-                } else if (currentTime - state.jointTracking.bodyNotDetectedTime > 500) {
-                    // Body has been missing for 500ms
-                    if (!state.jointTracking.lastBodyWarning || 
-                        currentTime - state.jointTracking.lastBodyWarning > 2000) {
-                        audioManager.speak(getCurrentLanguage() === 'zh' ? '未检测到身体' : 'Body not detected');
-                        state.jointTracking.lastBodyWarning = currentTime;
-                    }
-                }
-            }
-        }
+        // Remove body detection after countdown - focusing only on shot detection
         
         // Check if countdown is in progress - simplified for performance
         if (!state.shotDetection.isCountdownComplete && state.isTraining) {
@@ -1194,6 +1136,10 @@ function onPoseResults(results) {
                     // Start countdown after 500ms of visibility
                     if (visibilityDuration >= 500 && !state.countdownStarted) {
                         state.countdownStarted = true;
+                        // Hide body detection indicators when full body is detected
+                        document.querySelectorAll('.joint-indicator').forEach(indicator => {
+                            indicator.style.display = 'none';
+                        });
                         startCountdown();
                     }
                 }
@@ -1224,23 +1170,12 @@ function onPoseResults(results) {
         
         // Wrist drawing moved to top for better performance
         
-        // Skip username indicator during active shot tracking for performance
-        if (!state.shotDetection.isCountdownComplete) {
-            drawUsernameIndicator(ctx, results.poseLandmarks);
-        }
+        // Username indicator removed for performance
         
         // Detect shot
         detectShot(results.poseLandmarks);
     } else {
-        // Reset debug display when no pose detected
-        document.getElementById('poseDetected').textContent = 'No';
-        document.getElementById('wristAboveNose').textContent = 'No';
-        document.getElementById('currentAngle').textContent = '-';
-        document.getElementById('past90Degrees').textContent = 'No';
-        document.getElementById('angleVelocity').textContent = '0';
-        document.getElementById('detectionState').textContent = 'No Pose';
-        document.getElementById('shotDetected').textContent = '-';
-        document.getElementById('shotDuration').textContent = '-';
+        // Debug display updates removed for performance
     }
     
     // Capture frame for video generation - optimize by reducing getImageData calls
@@ -1346,7 +1281,7 @@ function startCountdown() {
     const countdownOverlay = document.getElementById('countdownOverlay');
     const countdownNumber = document.getElementById('countdownNumber');
     
-    // Keep joint indicators visible
+    // Show countdown number in center
     countdownNumber.style.display = 'block';
     
     let count = 3;
@@ -1508,9 +1443,7 @@ function detectShot(landmarks) {
     // Check if wrist is above nose
     const wristAboveNose = wrist.y < nose.y;
     
-    // Update debug display
-    document.getElementById('poseDetected').textContent = 'Yes';
-    document.getElementById('wristAboveNose').textContent = wristAboveNose ? 'Yes' : 'No';
+    // Debug display updates removed for performance
     
     if (wristAboveNose) {
         // Calculate angle between wrist-index vector
@@ -1521,8 +1454,7 @@ function detectShot(landmarks) {
         // For right hand: -90° = up, 0° = right, 90° = down, ±180° = left
         const angle = Math.atan2(dy, dx) * 180 / Math.PI;
         
-        document.getElementById('currentAngle').textContent = Math.round(angle);
-        document.getElementById('past90Degrees').textContent = (angle > -90 && angle < 0) ? 'Yes' : 'No';
+        // Debug angle display removed for performance
         
         // Add to angle history
         angleHistory.right.push({
@@ -1546,7 +1478,7 @@ function detectShot(landmarks) {
             const timeDiff = (recent.time - previous.time) / 1000; // seconds
             const angularVelocity = Math.abs(angleDiff / timeDiff);
             
-            document.getElementById('angleVelocity').textContent = Math.round(angularVelocity);
+            // Debug velocity display removed for performance
             
             // Check for forward shooting motion
             const isForwardMotion = angleDiff > 0 && recent.angle > -90 && previous.angle < -90;
@@ -1558,14 +1490,13 @@ function detectShot(landmarks) {
                 isForwardMotion &&
                 angularVelocity > VELOCITY_THRESHOLD) {
                 
-                document.getElementById('detectionState').textContent = 'Shot Detected!';
+                // Debug state display removed for performance
                 
                 // Analyze shot start
                 const shotStart = findShotStart(wristAnalysisHistory, currentTime);
                 if (shotStart) {
                     const shotDuration = (currentTime - shotStart.time) / 1000;
-                    document.getElementById('shotDuration').textContent = shotDuration.toFixed(2);
-                    document.getElementById('shotDetected').textContent = shotStart.uShapeFound ? 'Yes' : 'No';
+                    // Debug shot info display removed for performance
                     
                     // Store shot data for delayed saving
                     const shotDataToSave = {
@@ -1593,19 +1524,13 @@ function detectShot(landmarks) {
     } else {
         // Clear angle history when wrist is below nose
         angleHistory.right = [];
-        document.getElementById('currentAngle').textContent = '-';
-        document.getElementById('past90Degrees').textContent = 'No';
-        document.getElementById('angleVelocity').textContent = '0';
+        // Debug angle display reset removed for performance
     }
     
     // Update cooldown
     if (shotCooldown > 0) {
         shotCooldown--;
-        document.getElementById('detectionState').textContent = `Cooldown: ${Math.ceil(shotCooldown / 30)}s`;
-    } else if (!wristAboveNose) {
-        document.getElementById('detectionState').textContent = 'Idle';
-    } else {
-        document.getElementById('detectionState').textContent = 'Tracking';
+        // Debug state display removed for performance
     }
 }
 
@@ -1664,10 +1589,6 @@ async function generateVideoFromFrames(startTime, endTime) {
         return null;
     }
     
-    // Log frame rate information for debugging
-    const duration = (shotFrames[shotFrames.length - 1].time - shotFrames[0].time) / 1000;
-    const avgFps = shotFrames.length / duration;
-    console.log(`📹 Video generation: ${shotFrames.length} frames over ${duration.toFixed(2)}s = ${avgFps.toFixed(1)} FPS`);
     
     // Create a canvas for video generation
     const videoCanvas = document.createElement('canvas');
@@ -1703,9 +1624,8 @@ async function generateVideoFromFrames(startTime, endTime) {
         // Start recording
         recorder.start();
         
-        // Play back frames at normal speed (user can control speed during playback)
-        const PLAYBACK_SPEED = 1.0;
-        console.log(`Generating video at ${PLAYBACK_SPEED}x speed`);
+        // Simple playback at recorded speed
+        console.log(`📹 Generating video with ${shotFrames.length} frames`);
         
         let frameIndex = 0;
         const startTimestamp = shotFrames[0].time;
@@ -1718,19 +1638,20 @@ async function generateVideoFromFrames(startTime, endTime) {
             }
             
             const currentFrame = shotFrames[frameIndex];
-            const nextFrame = shotFrames[frameIndex + 1];
             
             // Draw the current frame
             videoCtx.putImageData(currentFrame.imageData, 0, 0);
             
             frameIndex++;
             
-            if (nextFrame) {
-                // Calculate when this frame should be shown at 0.75x speed
-                const originalDelay = nextFrame.time - currentFrame.time;
-                const scaledDelay = originalDelay / PLAYBACK_SPEED; // Divide by speed to slow down
+            if (frameIndex < shotFrames.length) {
+                // Play at original recorded speed
+                const nextFrame = shotFrames[frameIndex];
+                const currentTime = currentFrame.time - startTimestamp;
+                const nextTime = nextFrame.time - startTimestamp;
+                const actualInterval = nextTime - currentTime;
                 
-                setTimeout(playbackFrame, scaledDelay);
+                setTimeout(playbackFrame, actualInterval);
             } else {
                 // Last frame - stop after a short delay
                 setTimeout(() => recorder.stop(), 100);
