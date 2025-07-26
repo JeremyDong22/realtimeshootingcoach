@@ -1,0 +1,114 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Test Shot Detection with Debug Video</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            background-color: #1a1a1a;
+            color: #fff;
+            margin: 0;
+            padding: 20px;
+        }
+        .container {
+            max-width: 1200px;
+            margin: 0 auto;
+        }
+        #video, #canvas {
+            width: 100%;
+            max-width: 640px;
+            height: auto;
+            border: 2px solid #333;
+            margin-bottom: 20px;
+        }
+        button {
+            background-color: #0066ff;
+            color: white;
+            border: none;
+            padding: 10px 20px;
+            margin: 10px;
+            cursor: pointer;
+            border-radius: 5px;
+            font-size: 16px;
+        }
+        button:hover {
+            background-color: #0052cc;
+        }
+        button:disabled {
+            background-color: #666;
+            cursor: not-allowed;
+        }
+        .info-panel {
+            background-color: #2a2a2a;
+            padding: 15px;
+            border-radius: 5px;
+            margin-bottom: 20px;
+        }
+        .active {
+            color: #00ff00;
+        }
+        .debug-panel {
+            background-color: #333;
+            padding: 15px;
+            border-radius: 5px;
+            margin-top: 20px;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>Test Shot Detection with Auto-Download Debug Video</h1>
+        
+        <video id="video" autoplay playsinline></video>
+        <canvas id="canvas"></canvas>
+        
+        <div class="controls">
+            <button id="startBtn">Start Camera</button>
+            <button id="stopBtn" style="display: none;">Stop Camera</button>
+        </div>
+        
+        <div class="info-panel">
+            <h3>Info</h3>
+            <p>FPS: <span id="fps">0</span></p>
+            <p>Left Wrist: <span id="leftWrist">-</span></p>
+            <p>Right Wrist: <span id="rightWrist">-</span></p>
+            <p>Wrist Speed: <span id="wristSpeed">0</span> px/s</p>
+        </div>
+        
+        <div class="debug-panel">
+            <h3>Debug Info</h3>
+            <p>Pose Detected: <span id="poseDetected">No</span></p>
+            <p>Past -90°: <span id="past90Degrees">No</span></p>
+            <p>Wrist Above Shoulder: <span id="wristAboveShoulder">No</span></p>
+            <p>Current Angle: <span id="currentAngle">-</span>°</p>
+            <p>Angle Velocity: <span id="angleVelocity">-</span>°/s</p>
+            <p>Detection State: <span id="detectionState">Idle</span></p>
+            <p>U-Shape: <span id="uShapeDetected">-</span></p>
+            <p>Shot Start Time: <span id="shotStartTime">-</span></p>
+            <p>Shot Duration: <span id="shotDuration">-</span></p>
+        </div>
+        
+        <div class="instructions">
+            <h3>Instructions:</h3>
+            <ol>
+                <li>Click "Start Camera" to begin</li>
+                <li>Stand so your full upper body is visible</li>
+                <li>Make basketball shooting motions with your right hand</li>
+                <li>After each shot is detected, a debug video will auto-download</li>
+                <li>Check the downloaded video for timing information and U-shape detection</li>
+            </ol>
+        </div>
+    </div>
+    
+    <!-- MediaPipe dependencies -->
+    <script src="https://cdn.jsdelivr.net/npm/@mediapipe/camera_utils/camera_utils.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/@mediapipe/control_utils/control_utils.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/@mediapipe/drawing_utils/drawing_utils.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/@mediapipe/pose/pose.js"></script>
+    
+    <!-- App script -->
+    <script src="app-debug.js"></script>
+</body>
+</html>

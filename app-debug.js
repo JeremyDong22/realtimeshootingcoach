@@ -1,3 +1,10 @@
+// Updated: Enhanced debug video with auto-download and detailed time markers
+// - Auto-downloads debug video after each shot detection
+// - Shows exact timing: video start → U-shape → release with millisecond precision
+// - Bottom timeline shows visual progression through shot phases
+// - Top bar shows time differences from key events (U-shape, release)
+// - Saves complete wrist trajectory data for offline analysis
+
 const videoElement = document.getElementById('video');
 const canvasElement = document.getElementById('canvas');
 const canvasCtx = canvasElement.getContext('2d');
@@ -117,10 +124,12 @@ function findShotStart(wristHistory, releaseTime) {
         
         // Sort by time, closest to release first (latest time first)
         candidates.sort((a, b) => b.time - a.time);
+        const selectedCandidate = candidates[0];
         console.log(`\nSelected NEAREST U-shape to release:`);
-        console.log(`  Y=${Math.round(candidates[0].y)}, time=${new Date(candidates[0].time).toLocaleTimeString()}`);
-        console.log(`  Distance from release: ${((releaseTime - candidates[0].time) / 1000).toFixed(2)}s`);
-        return { ...candidates[0], uShapeFound: true };
+        console.log(`  Y=${Math.round(selectedCandidate.y)}, time=${new Date(selectedCandidate.time).toLocaleTimeString()}`);
+        console.log(`  Distance from release: ${((releaseTime - selectedCandidate.time) / 1000).toFixed(2)}s`);
+        
+        return { ...selectedCandidate, uShapeFound: true };
     }
     
     // Fallback: No U-shape found (catch and shoot scenario)
@@ -260,13 +269,13 @@ async function onResults(results) {
             [16, 20], // right wrist to right index
         ];
         
-        // Draw pose skeleton
+        // Draw pose skeleton with black lines
         drawConnectors(canvasCtx, results.poseLandmarks, BODY_CONNECTIONS, {
-            color: '#00FF00',
+            color: '#000000',
             lineWidth: 2
         });
         
-        // Draw only body landmarks (skip face points 0-10)
+        // Draw only body landmarks (skip face points 0-10) with orange joints
         const bodyLandmarks = results.poseLandmarks.filter((landmark, index) => {
             // Skip face landmarks (0-10) except for necessary body points
             // Keep body (11-22) and lower body (23-32)
@@ -274,9 +283,9 @@ async function onResults(results) {
             return index >= 11;
         });
         drawLandmarks(canvasCtx, bodyLandmarks, {
-            color: '#FF0000',
+            color: '#FF8000',
             lineWidth: 1,
-            radius: 3
+            radius: 4
         });
         
 
@@ -413,7 +422,8 @@ async function onResults(results) {
                             releaseTime: currentTime,
                             duration: shotDuration,
                             startPosition: { x: shotStart.x, y: shotStart.y },
-                            uShapeFound: shotStart.uShapeFound || false
+                            uShapeFound: shotStart.uShapeFound || false,
+                            uShapeTime: shotStart.uShapeFound ? shotStart.time : null
                         };
                         console.log(`  Shot duration: ${shotDuration.toFixed(2)}s`);
                         console.log(`  Start position: (${Math.round(shotStart.x)}, ${Math.round(shotStart.y)})`);
@@ -538,6 +548,24 @@ function triggerShotDetection() {
         
         document.querySelector('.container').appendChild(alertDiv);
         
+        // Send shot detection to parent window if in iframe
+        if (window.parent !== window && shotAnalysisData) {
+            window.parent.postMessage({
+                type: 'shotDetected',
+                shotData: {
+                    velocity: shotAnalysisData.velocity || (angleHistory.right.length >= 3 ? 
+                        Math.abs((angleHistory.right[angleHistory.right.length - 1].angle - angleHistory.right[angleHistory.right.length - 3].angle) / 
+                        ((angleHistory.right[angleHistory.right.length - 1].time - angleHistory.right[angleHistory.right.length - 3].time) / 1000)) : 0),
+                    duration: shotAnalysisData.duration,
+                    timestamp: Date.now(),
+                    startTime: shotAnalysisData.startTime,
+                    releaseTime: shotAnalysisData.releaseTime,
+                    uShapeFound: shotAnalysisData.uShapeFound
+                }
+            }, '*');
+            console.log('Sent shot detection to parent window');
+        }
+        
         // Wait 300ms to capture post-release frames, then save debug video
         if (shotAnalysisData && frameBuffer.length > 0) {
             setTimeout(() => {
@@ -554,6 +582,42 @@ function triggerShotDetection() {
         }, 1000);
     }
 }
+
+// Initialize IndexedDB for video storage
+let db;
+const DB_NAME = 'ShootingCoachDB';
+const DB_VERSION = 1;
+const STORE_NAME = 'shotVideos';
+
+// Open IndexedDB
+async function initDB() {
+    return new Promise((resolve, reject) => {
+        const request = indexedDB.open(DB_NAME, DB_VERSION);
+        
+        request.onerror = () => reject(request.error);
+        request.onsuccess = () => {
+            db = request.result;
+            resolve(db);
+        };
+        
+        request.onupgradeneeded = (event) => {
+            db = event.target.result;
+            if (!db.objectStoreNames.contains(STORE_NAME)) {
+                const store = db.createObjectStore(STORE_NAME, { keyPath: 'id', autoIncrement: true });
+                store.createIndex('timestamp', 'timestamp', { unique: false });
+            }
+        };
+    });
+}
+
+// Initialize DB when script loads
+initDB().then(async () => {
+    // Request persistent storage to prevent data loss
+    if (navigator.storage && navigator.storage.persist) {
+        const isPersisted = await navigator.storage.persist();
+        console.log(`IndexedDB persistent storage: ${isPersisted ? 'granted' : 'not granted'}`);
+    }
+}).catch(console.error);
 
 // Save debug video with all overlays
 async function saveDebugVideo() {
@@ -589,15 +653,75 @@ async function saveDebugVideo() {
         }
     };
     
-    recorder.onstop = () => {
+    recorder.onstop = async () => {
         const blob = new Blob(chunks, { type: 'video/webm' });
-        const url = URL.createObjectURL(blob);
-        const a = document.createElement('a');
-        a.href = url;
-        a.download = filename;
-        a.click();
-        URL.revokeObjectURL(url);
-        console.log(`Debug video saved: ${filename} (${(blob.size / 1024 / 1024).toFixed(2)} MB)`);
+        
+        // Auto-download the debug video
+        const downloadUrl = URL.createObjectURL(blob);
+        const downloadLink = document.createElement('a');
+        downloadLink.href = downloadUrl;
+        downloadLink.download = `debug_${filename}`;
+        downloadLink.style.display = 'none';
+        document.body.appendChild(downloadLink);
+        downloadLink.click();
+        document.body.removeChild(downloadLink);
+        setTimeout(() => URL.revokeObjectURL(downloadUrl), 100);
+        
+        console.log(`Auto-downloaded debug video: debug_${filename}`);
+        
+        // Save to IndexedDB
+        try {
+            if (!db) await initDB();
+            
+            const videoData = {
+                filename: filename,
+                timestamp: Date.now(),
+                blob: blob,
+                shotData: {
+                    duration: shotAnalysisData.duration,
+                    velocity: shotAnalysisData.velocity || (angleHistory.right.length >= 3 ? 
+                        Math.abs((angleHistory.right[angleHistory.right.length - 1].angle - angleHistory.right[angleHistory.right.length - 3].angle) / 
+                        ((angleHistory.right[angleHistory.right.length - 1].time - angleHistory.right[angleHistory.right.length - 3].time) / 1000)) : 0),
+                    startTime: shotAnalysisData.startTime,
+                    releaseTime: shotAnalysisData.releaseTime,
+                    uShapeFound: shotAnalysisData.uShapeFound,
+                    uShapeTime: shotAnalysisData.uShapeTime
+                },
+                debugData: {
+                    wristTrajectory: [...wristAnalysisHistory],
+                    paddedStartTime: paddedStartTime,
+                    paddedEndTime: paddedEndTime,
+                    actualPaddingBefore: shotAnalysisData.startTime - paddedStartTime,
+                    actualPaddingAfter: paddedEndTime - shotAnalysisData.releaseTime
+                }
+            };
+            
+            const transaction = db.transaction([STORE_NAME], 'readwrite');
+            const store = transaction.objectStore(STORE_NAME);
+            const request = store.add(videoData);
+            
+            request.onsuccess = () => {
+                console.log(`Video saved to IndexedDB with ID: ${request.result}`);
+                console.log(`Video size: ${(blob.size / 1024 / 1024).toFixed(2)} MB`);
+                
+                // Send notification to parent window if in iframe
+                if (window.parent !== window) {
+                    window.parent.postMessage({
+                        type: 'shotVideoSaved',
+                        videoId: request.result,
+                        filename: filename,
+                        shotData: videoData.shotData
+                    }, '*');
+                }
+            };
+            
+            request.onerror = () => {
+                console.error('Failed to save video to IndexedDB:', request.error);
+            };
+            
+        } catch (error) {
+            console.error('Error saving video to IndexedDB:', error);
+        }
     };
     
     // Start recording
@@ -634,27 +758,110 @@ async function saveDebugVideo() {
         const frame = shotFrames[frameIndex];
         videoCtx.putImageData(frame.imageData, 0, 0);
         
+        // Check if this is the U-shape detection frame and draw big blue overlay
+        if (shotAnalysisData.uShapeTime && Math.abs(frame.time - shotAnalysisData.uShapeTime) < 50) {
+            videoCtx.save();
+            
+            // Draw large blue "U-SHAPE DETECTED" text
+            videoCtx.fillStyle = '#0066FF';
+            videoCtx.font = 'bold 64px Arial';
+            videoCtx.textAlign = 'center';
+            videoCtx.textBaseline = 'middle';
+            videoCtx.fillText('U-SHAPE DETECTED', videoCanvas.width / 2, videoCanvas.height / 2);
+            
+            // Draw blue border
+            videoCtx.strokeStyle = '#0066FF';
+            videoCtx.lineWidth = 12;
+            videoCtx.strokeRect(6, 6, videoCanvas.width - 12, videoCanvas.height - 12);
+            
+            // Add timestamp
+            videoCtx.fillStyle = '#0066FF';
+            videoCtx.font = '24px Arial';
+            videoCtx.textAlign = 'center';
+            videoCtx.textBaseline = 'alphabetic';
+            videoCtx.fillText(`Time: ${new Date(frame.time).toLocaleTimeString()}`, videoCanvas.width / 2, videoCanvas.height / 2 + 50);
+            
+            videoCtx.restore();
+        }
+        
         // Add debug info overlay
         videoCtx.save();
         
-        // Top info bar
-        videoCtx.fillStyle = 'rgba(0, 0, 0, 0.7)';
-        videoCtx.fillRect(0, 0, videoCanvas.width, 30);
+        // Draw persistent U-shape marker if detected
+        if (shotAnalysisData.uShapeFound && shotAnalysisData.startPosition) {
+            videoCtx.save();
+            
+            // Draw a subtle marker for U-shape position throughout the video
+            videoCtx.strokeStyle = '#00FF00';
+            videoCtx.lineWidth = 2;
+            videoCtx.globalAlpha = 0.5;
+            
+            // Draw crosshair at U-shape position
+            const crossSize = 15;
+            videoCtx.beginPath();
+            videoCtx.moveTo(shotAnalysisData.startPosition.x - crossSize, shotAnalysisData.startPosition.y);
+            videoCtx.lineTo(shotAnalysisData.startPosition.x + crossSize, shotAnalysisData.startPosition.y);
+            videoCtx.moveTo(shotAnalysisData.startPosition.x, shotAnalysisData.startPosition.y - crossSize);
+            videoCtx.lineTo(shotAnalysisData.startPosition.x, shotAnalysisData.startPosition.y + crossSize);
+            videoCtx.stroke();
+            
+            // Small label
+            videoCtx.globalAlpha = 0.7;
+            videoCtx.fillStyle = '#00FF00';
+            videoCtx.font = '10px Arial';
+            videoCtx.textAlign = 'center';
+            videoCtx.fillText('U', shotAnalysisData.startPosition.x, shotAnalysisData.startPosition.y - 20);
+            videoCtx.textAlign = 'left';
+            
+            videoCtx.restore();
+        }
+        
+        // Top info bar with timing details
+        videoCtx.fillStyle = 'rgba(0, 0, 0, 0.8)';
+        videoCtx.fillRect(0, 0, videoCanvas.width, 60);
+        
+        // Frame info
         videoCtx.fillStyle = '#FFFFFF';
         videoCtx.font = '14px Arial';
-        videoCtx.fillText(`Frame ${frameIndex + 1}/${shotFrames.length} - ${new Date(frame.time).toLocaleTimeString()}`, 10, 20);
+        videoCtx.fillText(`Frame ${frameIndex + 1}/${shotFrames.length} - ${new Date(frame.time).toLocaleTimeString('en-US', { hour12: false, hour: '2-digit', minute: '2-digit', second: '2-digit', fractionalSecondDigits: 3 })}`, 10, 20);
         
-        // Show shot duration on the right side of top bar
+        // Show shot duration on the right side
         videoCtx.fillStyle = '#FFD700';
         videoCtx.font = 'bold 14px Arial';
         videoCtx.textAlign = 'right';
         videoCtx.fillText(`Shot Duration: ${shotAnalysisData.duration.toFixed(2)}s`, videoCanvas.width - 10, 20);
-        videoCtx.textAlign = 'left'; // Reset alignment
+        videoCtx.textAlign = 'left';
+        
+        // Time differences on second line
+        videoCtx.font = '12px Arial';
+        videoCtx.fillStyle = '#00FF00';
+        const msFromVideoStart = frame.time - paddedStartTime;
+        videoCtx.fillText(`From Video Start: +${msFromVideoStart}ms`, 10, 40);
+        
+        if (shotAnalysisData.uShapeFound && shotAnalysisData.uShapeTime) {
+            const msFromUShape = frame.time - shotAnalysisData.uShapeTime;
+            videoCtx.fillStyle = msFromUShape >= 0 ? '#00BFFF' : '#FF6666';
+            videoCtx.fillText(`From U-Shape: ${msFromUShape >= 0 ? '+' : ''}${msFromUShape}ms`, 250, 40);
+        } else {
+            videoCtx.fillStyle = '#FFAA00';
+            videoCtx.fillText(`No U-Shape Detected`, 250, 40);
+        }
+        
+        const msFromRelease = frame.time - shotAnalysisData.releaseTime;
+        videoCtx.fillStyle = msFromRelease >= 0 ? '#FF6666' : '#00BFFF';
+        videoCtx.fillText(`From Release: ${msFromRelease >= 0 ? '+' : ''}${msFromRelease}ms`, 500, 40);
+        
+        // Padding info on the right
+        videoCtx.textAlign = 'right';
+        videoCtx.fillStyle = '#AAAAAA';
+        videoCtx.font = '11px Arial';
+        videoCtx.fillText(`Padding: ${shotAnalysisData.startTime - paddedStartTime}ms before, ${paddedEndTime - shotAnalysisData.releaseTime}ms after`, videoCanvas.width - 10, 40);
+        videoCtx.textAlign = 'left';
         
         // Right side debug panel
         if (frame.debugInfo) {
             videoCtx.fillStyle = 'rgba(0, 0, 0, 0.7)';
-            videoCtx.fillRect(videoCanvas.width - 200, 40, 190, 140); // Increased height
+            videoCtx.fillRect(videoCanvas.width - 200, 40, 190, 180); // Increased height for more info
             
             videoCtx.fillStyle = '#00FF00';
             videoCtx.font = '12px Arial';
@@ -688,6 +895,34 @@ async function saveDebugVideo() {
                 videoCtx.fillStyle = '#00BFFF';
                 videoCtx.fillText(`Elapsed: ${elapsedTime.toFixed(2)}s`, videoCanvas.width - 190, yPos);
             }
+            
+            // Show U-shape detection status
+            yPos += 20;
+            if (shotAnalysisData.uShapeFound) {
+                videoCtx.fillStyle = '#00FF00';
+                videoCtx.fillText(`U-Shape: Found`, videoCanvas.width - 190, yPos);
+            } else {
+                videoCtx.fillStyle = '#FFAA00';
+                videoCtx.fillText(`U-Shape: Not Found`, videoCanvas.width - 190, yPos);
+            }
+        }
+        
+        // Mark first frame of video
+        if (frameIndex === 0) {
+            videoCtx.save();
+            videoCtx.strokeStyle = '#00FF00';
+            videoCtx.lineWidth = 4;
+            videoCtx.setLineDash([10, 5]);
+            videoCtx.strokeRect(2, 2, videoCanvas.width - 4, videoCanvas.height - 4);
+            videoCtx.setLineDash([]);
+            
+            videoCtx.fillStyle = '#00FF00';
+            videoCtx.font = 'bold 18px Arial';
+            videoCtx.fillText('VIDEO START', 10, videoCanvas.height - 70);
+            
+            videoCtx.font = '14px Arial';
+            videoCtx.fillText(`Actual padding before shot: ${shotAnalysisData.startTime - paddedStartTime}ms`, 10, videoCanvas.height - 50);
+            videoCtx.restore();
         }
         
         // Mark shot start and release frames
@@ -698,14 +933,119 @@ async function saveDebugVideo() {
             videoCtx.fillStyle = '#00FF00';
             videoCtx.font = 'bold 20px Arial';
             videoCtx.fillText('SHOT START', 10, videoCanvas.height - 20);
+            
+            // Add U-shape detection info
+            if (shotAnalysisData.uShapeFound) {
+                videoCtx.fillStyle = '#00FF00';
+                videoCtx.font = 'bold 16px Arial';
+                videoCtx.fillText('U-SHAPE DETECTED', 10, videoCanvas.height - 45);
+                
+                // Draw a marker at the U-shape position if we have wrist position
+                if (shotAnalysisData.startPosition) {
+                    // Draw a special marker for U-shape
+                    videoCtx.save();
+                    videoCtx.strokeStyle = '#00FF00';
+                    videoCtx.lineWidth = 3;
+                    videoCtx.setLineDash([5, 5]);
+                    videoCtx.beginPath();
+                    videoCtx.arc(shotAnalysisData.startPosition.x, shotAnalysisData.startPosition.y, 25, 0, 2 * Math.PI);
+                    videoCtx.stroke();
+                    videoCtx.setLineDash([]);
+                    
+                    // Draw U-shape symbol
+                    videoCtx.fillStyle = '#00FF00';
+                    videoCtx.font = 'bold 24px Arial';
+                    videoCtx.textAlign = 'center';
+                    videoCtx.fillText('U', shotAnalysisData.startPosition.x, shotAnalysisData.startPosition.y + 8);
+                    videoCtx.textAlign = 'left';
+                    videoCtx.restore();
+                }
+            } else {
+                videoCtx.fillStyle = '#FFAA00';
+                videoCtx.font = 'bold 16px Arial';
+                videoCtx.fillText('NO U-SHAPE (3s FALLBACK)', 10, videoCanvas.height - 45);
+            }
         } else if (Math.abs(frame.time - shotAnalysisData.releaseTime) < 50) {
             videoCtx.strokeStyle = '#FF0000';
             videoCtx.lineWidth = 4;
             videoCtx.strokeRect(2, 2, videoCanvas.width - 4, videoCanvas.height - 4);
             videoCtx.fillStyle = '#FF0000';
             videoCtx.font = 'bold 20px Arial';
-            videoCtx.fillText('RELEASE', 10, videoCanvas.height - 20);
+            videoCtx.fillText('SHOT STOP (RELEASE)', 10, videoCanvas.height - 20);
+            
+            // Add detection criteria info
+            videoCtx.fillStyle = '#FF0000';
+            videoCtx.font = '14px Arial';
+            videoCtx.fillText('Wrist above nose + Angle > -90° + Speed > 300°/s', 10, videoCanvas.height - 45);
         }
+        
+        // Draw timeline at bottom
+        videoCtx.save();
+        const timelineHeight = 40;
+        const timelineY = videoCanvas.height - timelineHeight;
+        
+        // Timeline background
+        videoCtx.fillStyle = 'rgba(0, 0, 0, 0.8)';
+        videoCtx.fillRect(0, timelineY, videoCanvas.width, timelineHeight);
+        
+        // Calculate positions
+        const totalDuration = paddedEndTime - paddedStartTime;
+        const currentProgress = (frame.time - paddedStartTime) / totalDuration;
+        const uShapeProgress = shotAnalysisData.uShapeTime ? (shotAnalysisData.uShapeTime - paddedStartTime) / totalDuration : -1;
+        const shotStartProgress = (shotAnalysisData.startTime - paddedStartTime) / totalDuration;
+        const releaseProgress = (shotAnalysisData.releaseTime - paddedStartTime) / totalDuration;
+        
+        // Draw timeline bar
+        videoCtx.fillStyle = '#333333';
+        videoCtx.fillRect(10, timelineY + 15, videoCanvas.width - 20, 10);
+        
+        // Draw progress
+        videoCtx.fillStyle = '#00BFFF';
+        videoCtx.fillRect(10, timelineY + 15, (videoCanvas.width - 20) * currentProgress, 10);
+        
+        // Mark U-shape position
+        if (uShapeProgress >= 0) {
+            const uShapeX = 10 + (videoCanvas.width - 20) * uShapeProgress;
+            videoCtx.strokeStyle = '#0066FF';
+            videoCtx.lineWidth = 3;
+            videoCtx.beginPath();
+            videoCtx.moveTo(uShapeX, timelineY + 5);
+            videoCtx.lineTo(uShapeX, timelineY + 35);
+            videoCtx.stroke();
+            
+            videoCtx.fillStyle = '#0066FF';
+            videoCtx.font = '10px Arial';
+            videoCtx.textAlign = 'center';
+            videoCtx.fillText('U', uShapeX, timelineY + 10);
+        }
+        
+        // Mark shot start
+        const shotStartX = 10 + (videoCanvas.width - 20) * shotStartProgress;
+        videoCtx.strokeStyle = '#00FF00';
+        videoCtx.lineWidth = 3;
+        videoCtx.beginPath();
+        videoCtx.moveTo(shotStartX, timelineY + 5);
+        videoCtx.lineTo(shotStartX, timelineY + 35);
+        videoCtx.stroke();
+        
+        // Mark release
+        const releaseX = 10 + (videoCanvas.width - 20) * releaseProgress;
+        videoCtx.strokeStyle = '#FF0000';
+        videoCtx.lineWidth = 3;
+        videoCtx.beginPath();
+        videoCtx.moveTo(releaseX, timelineY + 5);
+        videoCtx.lineTo(releaseX, timelineY + 35);
+        videoCtx.stroke();
+        
+        // Timeline labels
+        videoCtx.font = '10px Arial';
+        videoCtx.fillStyle = '#FFFFFF';
+        videoCtx.textAlign = 'left';
+        videoCtx.fillText('0ms', 10, timelineY + 10);
+        videoCtx.textAlign = 'right';
+        videoCtx.fillText(`${totalDuration}ms`, videoCanvas.width - 10, timelineY + 10);
+        
+        videoCtx.restore();
         
         videoCtx.restore();
         
@@ -778,3 +1118,68 @@ stopBtn.addEventListener('click', () => {
     shotAnalysisData = null;
     frameBuffer.length = 0;
 });
+
+// Helper functions for video management
+async function getAllVideos() {
+    if (!db) await initDB();
+    
+    return new Promise((resolve, reject) => {
+        const transaction = db.transaction([STORE_NAME], 'readonly');
+        const store = transaction.objectStore(STORE_NAME);
+        const request = store.getAll();
+        
+        request.onsuccess = () => {
+            // Sort by timestamp, newest first
+            const videos = request.result.sort((a, b) => b.timestamp - a.timestamp);
+            resolve(videos);
+        };
+        request.onerror = () => reject(request.error);
+    });
+}
+
+async function getVideo(id) {
+    if (!db) await initDB();
+    
+    return new Promise((resolve, reject) => {
+        const transaction = db.transaction([STORE_NAME], 'readonly');
+        const store = transaction.objectStore(STORE_NAME);
+        const request = store.get(id);
+        
+        request.onsuccess = () => resolve(request.result);
+        request.onerror = () => reject(request.error);
+    });
+}
+
+async function deleteVideo(id) {
+    if (!db) await initDB();
+    
+    return new Promise((resolve, reject) => {
+        const transaction = db.transaction([STORE_NAME], 'readwrite');
+        const store = transaction.objectStore(STORE_NAME);
+        const request = store.delete(id);
+        
+        request.onsuccess = () => resolve();
+        request.onerror = () => reject(request.error);
+    });
+}
+
+async function clearAllVideos() {
+    if (!db) await initDB();
+    
+    return new Promise((resolve, reject) => {
+        const transaction = db.transaction([STORE_NAME], 'readwrite');
+        const store = transaction.objectStore(STORE_NAME);
+        const request = store.clear();
+        
+        request.onsuccess = () => resolve();
+        request.onerror = () => reject(request.error);
+    });
+}
+
+// Export functions for parent window
+window.videoStorage = {
+    getAllVideos,
+    getVideo,
+    deleteVideo,
+    clearAllVideos
+};

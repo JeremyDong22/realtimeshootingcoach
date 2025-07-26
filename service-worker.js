@@ -2,11 +2,9 @@ const CACHE_NAME = 'shooting-coach-v1';
 const urlsToCache = [
   '/',
   '/styles.css',
-  '/app.js',
+  '/app-navigation.js',
   '/manifest.json',
-  'https://cdn.jsdelivr.net/npm/@mediapipe/pose/pose.js',
-  'https://cdn.jsdelivr.net/npm/@mediapipe/camera_utils/camera_utils.js',
-  'https://cdn.jsdelivr.net/npm/@mediapipe/drawing_utils/drawing_utils.js'
+  '/index.html'
 ];
 
 // Install event - cache resources

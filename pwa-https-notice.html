@@ -1,0 +1,118 @@
+<!DOCTYPE html>
+<html lang="zh">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>投篮教练 - HTTPS要求</title>
+    <style>
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+            background: #f5f5f5;
+            margin: 0;
+            padding: 20px;
+            display: flex;
+            min-height: 100vh;
+            align-items: center;
+            justify-content: center;
+        }
+        .container {
+            background: white;
+            border-radius: 20px;
+            padding: 40px;
+            max-width: 500px;
+            box-shadow: 0 10px 30px rgba(0,0,0,0.1);
+            text-align: center;
+        }
+        .icon {
+            font-size: 60px;
+            margin-bottom: 20px;
+        }
+        h1 {
+            color: #333;
+            font-size: 24px;
+            margin-bottom: 20px;
+        }
+        p {
+            color: #666;
+            line-height: 1.6;
+            margin-bottom: 20px;
+        }
+        .warning {
+            background: #fff3cd;
+            border: 1px solid #ffeeba;
+            border-radius: 10px;
+            padding: 15px;
+            margin: 20px 0;
+            color: #856404;
+        }
+        .steps {
+            text-align: left;
+            background: #f8f9fa;
+            border-radius: 10px;
+            padding: 20px;
+            margin: 20px 0;
+        }
+        .steps h3 {
+            margin-top: 0;
+        }
+        .steps ol {
+            margin: 10px 0;
+            padding-left: 20px;
+        }
+        .steps li {
+            margin: 10px 0;
+        }
+        .button {
+            display: inline-block;
+            background: #FF6B35;
+            color: white;
+            padding: 15px 30px;
+            border-radius: 25px;
+            text-decoration: none;
+            margin-top: 20px;
+            font-weight: 500;
+        }
+        code {
+            background: #e9ecef;
+            padding: 2px 6px;
+            border-radius: 4px;
+            font-family: monospace;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="icon">🔒</div>
+        <h1>需要安全连接</h1>
+        
+        <div class="warning">
+            <p><strong>问题：</strong>投篮教练需要通过HTTPS安全连接访问摄像头。当前您使用的是不安全的连接。</p>
+        </div>
+
+        <p>为了保护您的隐私，现代浏览器要求通过安全连接（HTTPS）才能访问摄像头。</p>
+
+        <div class="steps">
+            <h3>解决方案：</h3>
+            <ol>
+                <li><strong>部署到支持HTTPS的服务器：</strong>
+                    <ul>
+                        <li>Vercel (推荐): <code>vercel.com</code></li>
+                        <li>Netlify: <code>netlify.com</code></li>
+                        <li>GitHub Pages: <code>pages.github.com</code></li>
+                    </ul>
+                </li>
+                <li><strong>本地测试（仅限开发）：</strong>
+                    <ul>
+                        <li>使用 <code>localhost</code> 而不是IP地址</li>
+                        <li>或使用 ngrok 创建HTTPS隧道</li>
+                    </ul>
+                </li>
+            </ol>
+        </div>
+
+        <p>部署后，您的应用将自动获得HTTPS证书，摄像头功能即可正常使用。</p>
+
+        <a href="https://vercel.com/new" class="button" target="_blank">免费部署到Vercel →</a>
+    </div>
+</body>
+</html>

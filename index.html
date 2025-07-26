@@ -2,293 +2,695 @@
 <html lang="en">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>Shooting Coach - AI Basketball Training</title>
-    <link rel="manifest" href="./manifest.json">
-    <link rel="stylesheet" href="styles.css">
-    <meta name="theme-color" content="#000000">
-    <meta name="mobile-web-app-capable" content="yes">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
+    <title>投篮教练 - 篮球训练</title>
+    <link rel="stylesheet" href="styles.css?v=3.0">
+    <link rel="manifest" href="manifest.json">
+    <link rel="apple-touch-icon" href="/apple-touch-icon.png">
+    <link rel="icon" href="/favicon.ico" type="image/x-icon">
+    <meta name="theme-color" content="#0A0A0A">
     <meta name="apple-mobile-web-app-capable" content="yes">
-    <meta name="apple-mobile-web-app-status-bar-style" content="default">
+    <meta name="mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-status-bar-style" content="black">
+    <meta name="apple-mobile-web-app-title" content="投篮教练">
+    <meta name="application-name" content="投篮教练">
 </head>
 <body>
-    <div class="container">
-        <!-- Index/Landing Page -->
-        <div id="indexPage" class="page index-page active">
-            <!-- Basketball Icon -->
-            <svg class="basketball-icon" viewBox="0 0 100 100" fill="none" xmlns="http://www.w3.org/2000/svg">
-                <circle cx="50" cy="50" r="48" stroke="#1A1A1A" stroke-width="2"/>
-                <path d="M50 2 C50 2, 50 98, 50 98" stroke="#1A1A1A" stroke-width="2"/>
-                <path d="M2 50 C2 50, 98 50, 98 50" stroke="#1A1A1A" stroke-width="2"/>
-                <path d="M50 2 Q25 25, 2 50 Q25 75, 50 98 Q75 75, 98 50 Q75 25, 50 2" stroke="#1A1A1A" stroke-width="2" fill="none"/>
-            </svg>
-
-            <div class="brand-section">
-                <h1 class="brand-title">Shooting Coach</h1>
-                
-                <!-- Follow-through Hand Icon -->
-                <svg class="hand-icon" viewBox="0 0 120 120" fill="none" xmlns="http://www.w3.org/2000/svg">
-                    <!-- Wrist and palm -->
-                    <path d="M60 80 L60 100 L40 100 L40 60 L60 60 Z" stroke="#1A1A1A" stroke-width="2" fill="none"/>
-                    <!-- Fingers in follow-through position -->
-                    <path d="M40 60 L35 40 Q35 35, 40 35 L45 55" stroke="#1A1A1A" stroke-width="2" fill="none" stroke-linecap="round"/>
-                    <path d="M45 60 L43 35 Q43 30, 48 30 L50 55" stroke="#1A1A1A" stroke-width="2" fill="none" stroke-linecap="round"/>
-                    <path d="M50 60 L50 30 Q50 25, 55 25 L55 55" stroke="#1A1A1A" stroke-width="2" fill="none" stroke-linecap="round"/>
-                    <path d="M55 60 L57 35 Q57 30, 62 30 L60 55" stroke="#1A1A1A" stroke-width="2" fill="none" stroke-linecap="round"/>
-                    <!-- Thumb -->
-                    <path d="M60 70 L70 65 Q75 63, 75 68 L65 75" stroke="#1A1A1A" stroke-width="2" fill="none" stroke-linecap="round"/>
-                    <!-- Motion lines -->
-                    <path d="M30 45 L25 43" stroke="#1A1A1A" stroke-width="1" opacity="0.5"/>
-                    <path d="M30 50 L25 50" stroke="#1A1A1A" stroke-width="1" opacity="0.5"/>
-                    <path d="M30 55 L25 57" stroke="#1A1A1A" stroke-width="1" opacity="0.5"/>
-                </svg>
-
-                <div class="auth-buttons">
-                    <button class="btn btn-secondary" onclick="handleIndexLogin()">Log In</button>
-                    <button class="btn btn-primary" onclick="navigateTo('signup')">Sign Up</button>
+    <div id="app">
+        <!-- Landing Page -->
+        <div id="landing" class="page active">
+            <div class="landing-content">
+                <div class="logo-container">
+                    <div class="logo-circle">
+                        <!-- Basketball Icon - Larger and Clearer -->
+                        <svg viewBox="0 0 24 24" class="basketball-icon" fill="none" xmlns="http://www.w3.org/2000/svg">
+                            <circle cx="12" cy="12" r="9" stroke="currentColor" stroke-width="2"/>
+                            <path d="M12 3C12 3 12 21 12 21" stroke="currentColor" stroke-width="2"/>
+                            <path d="M3 12C3 12 21 12 21 12" stroke="currentColor" stroke-width="2"/>
+                            <path d="M6.5 6.5C8.5 8.5 8.5 15.5 6.5 17.5" stroke="currentColor" stroke-width="2"/>
+                            <path d="M17.5 6.5C15.5 8.5 15.5 15.5 17.5 17.5" stroke="currentColor" stroke-width="2"/>
+                        </svg>
+                    </div>
                 </div>
-            </div>
-
-            <div class="credits">
-                <p>Powered by MediaPipe</p>
-                <p>Made by Jeremy Dong</p>
-            </div>
-        </div>
-
-        <!-- Login Page -->
-        <div id="loginPage" class="page auth-page">
-            <div class="auth-container">
-                <h1 class="auth-title">Welcome Back</h1>
-                <p class="auth-subtitle">Log in to continue your training</p>
                 
-                <form class="auth-form" onsubmit="handleLogin(event)">
-                    <div class="form-group">
-                        <label class="form-label">Email</label>
-                        <input type="email" class="form-input" id="loginEmail" autocomplete="email" required>
-                    </div>
-                    <div class="form-group">
-                        <label class="form-label">Password</label>
-                        <input type="password" class="form-input" id="loginPassword" autocomplete="current-password" required>
-                    </div>
-                    <button type="submit" class="btn btn-primary" style="width: 100%; margin-top: 24px;">Log In</button>
-                </form>
+                <h1 class="app-title" data-i18n="appTitle">投篮教练</h1>
+                <p class="app-subtitle" data-i18n="appSubtitle">精英篮球训练</p>
                 
-                <div class="auth-footer">
-                    <p>Don't have an account? <a href="#" onclick="navigateTo('signup'); return false;">Sign up</a></p>
-                    <p><a href="#" onclick="navigateTo('index'); return false;">Back to home</a></p>
+                <div class="auth-form-wrapper">
+                    <div class="auth-toggle">
+                        <button class="toggle-btn active" data-mode="login" data-i18n="login">登录</button>
+                        <button class="toggle-btn" data-mode="signup" data-i18n="signup">注册</button>
+                    </div>
+                    
+                    <form id="authForm" class="auth-form">
+                        <div class="form-group" id="nameGroup" style="display: none;">
+                            <input type="text" id="name" class="form-input" placeholder="您的姓名" data-i18n-placeholder="yourName" autocomplete="name">
+                        </div>
+                        
+                        <div class="form-group">
+                            <input type="text" id="emailOrPhone" class="form-input" placeholder="邮箱或手机号" data-i18n-placeholder="emailOrPhone" autocomplete="username" required>
+                        </div>
+                        
+                        <div class="form-group">
+                            <input type="password" id="password" class="form-input" placeholder="密码" data-i18n-placeholder="password" autocomplete="current-password" required>
+                            <div class="password-requirements" id="passwordRequirements" style="display: none;">
+                                <p class="requirement-title" data-i18n="passwordRequirements">密码必须包含：</p>
+                                <ul class="requirement-list">
+                                    <li id="req-length" data-i18n="atLeast8Chars">至少8个字符</li>
+                                    <li id="req-uppercase" data-i18n="oneUppercase">一个大写字母</li>
+                                    <li id="req-lowercase" data-i18n="oneLowercase">一个小写字母</li>
+                                    <li id="req-number" data-i18n="oneNumber">一个数字</li>
+                                    <li id="req-special" data-i18n="oneSpecial">一个特殊字符 (!@#$%^&*)</li>
+                                </ul>
+                            </div>
+                        </div>
+                        
+                        <div class="form-group" id="handGroup" style="display: none;">
+                            <label class="form-label" data-i18n="selectShootingHand">选择投篮惯用手</label>
+                            <div class="hand-selection">
+                                <button type="button" class="hand-option" data-hand="right">
+                                    <span class="hand-icon">✋</span>
+                                    <span data-i18n="rightHand">右手</span>
+                                </button>
+                                <button type="button" class="hand-option" data-hand="left">
+                                    <span class="hand-icon">🤚</span>
+                                    <span data-i18n="leftHand">左手</span>
+                                </button>
+                            </div>
+                            <input type="hidden" id="shootingHand" name="shootingHand" value="right">
+                        </div>
+                        
+                        <button type="submit" class="btn-primary" id="authSubmit">
+                            <span class="btn-text" data-i18n="login">登录</span>
+                            <div class="btn-loader" style="display: none;"></div>
+                        </button>
+                    </form>
                 </div>
-            </div>
-        </div>
-
-        <!-- Signup Page -->
-        <div id="signupPage" class="page auth-page">
-            <div class="auth-container">
-                <h1 class="auth-title">Join Shooting Coach</h1>
-                <p class="auth-subtitle">Start your basketball training journey</p>
                 
-                <form class="auth-form" onsubmit="handleSignup(event)">
-                    <div class="form-group">
-                        <label class="form-label">Name</label>
-                        <input type="text" class="form-input" id="signupName" autocomplete="name" required>
-                    </div>
-                    <div class="form-group">
-                        <label class="form-label">Email</label>
-                        <input type="email" class="form-input" id="signupEmail" autocomplete="email" required>
-                    </div>
-                    <div class="form-group">
-                        <label class="form-label">Password</label>
-                        <input type="password" class="form-input" id="signupPassword" autocomplete="new-password" required>
-                    </div>
-                    <button type="submit" class="btn btn-primary" style="width: 100%; margin-top: 24px;">Sign Up</button>
-                </form>
-                
-                <div class="auth-footer">
-                    <p>Already have an account? <a href="#" onclick="navigateTo('login'); return false;">Log in</a></p>
-                    <p><a href="#" onclick="navigateTo('index'); return false;">Back to home</a></p>
+                <div class="auth-divider">
+                    <span data-i18n="orContinueWith">或使用以下方式继续</span>
                 </div>
+                
+                <div class="social-auth-buttons">
+                    <button type="button" class="social-btn google-btn" id="googleAuthBtn" style="width: 100%;">
+                        <svg width="18" height="18" viewBox="0 0 18 18" fill="none" xmlns="http://www.w3.org/2000/svg">
+                            <path d="M17.64 9.2c0-.637-.057-1.251-.164-1.84H9v3.481h4.844c-.209 1.125-.843 2.078-1.796 2.717v2.258h2.908c1.702-1.567 2.684-3.874 2.684-6.615z" fill="#4285F4"/>
+                            <path d="M9 18c2.43 0 4.467-.806 5.956-2.184l-2.908-2.258c-.806.54-1.837.86-3.048.86-2.344 0-4.328-1.584-5.036-3.711H.957v2.332C2.438 15.983 5.482 18 9 18z" fill="#34A853"/>
+                            <path d="M3.964 10.707c-.18-.54-.282-1.117-.282-1.707s.102-1.167.282-1.707V4.961H.957C.347 6.173 0 7.548 0 9s.348 2.827.957 4.039l3.007-2.332z" fill="#FBBC05"/>
+                            <path d="M9 3.58c1.321 0 2.508.454 3.44 1.345l2.582-2.58C13.463.891 11.426 0 9 0 5.482 0 2.438 2.017.957 4.961L3.964 7.29C4.672 5.163 6.656 3.58 9 3.58z" fill="#EA4335"/>
+                        </svg>
+                        <span data-i18n="continueWithGoogle">使用 Google 继续（即将推出）</span>
+                    </button>
+                </div>
+                
+                <div class="user-count" id="userCount"></div>
             </div>
         </div>
 
-        <!-- Home Page -->
-        <div id="homePage" class="page">
-            <div class="home-header">
-                <div class="stats-section">
-                    <div class="stat-item">
-                        <div class="stat-label">Total Shots</div>
-                        <div class="stat-value" id="totalShots">0</div>
-                    </div>
-                    <div class="stat-item">
-                        <div class="stat-label">Accuracy</div>
-                        <div class="stat-value" id="accuracy">--%</div>
-                    </div>
-                    <div class="stat-item">
-                        <div class="stat-label">Avg Speed</div>
-                        <div class="stat-value" id="avgSpeed">--°/s</div>
-                    </div>
-                    <div class="stat-item">
-                        <div class="stat-label">CoM Deviation</div>
-                        <div class="stat-value" id="comDeviation">--cm</div>
-                    </div>
-                </div>
-                <button class="share-btn" onclick="shareStats()">
-                    <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                        <path d="M4 12v8a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-8"/>
-                        <polyline points="16 6 12 2 8 6"/>
-                        <line x1="12" y1="2" x2="12" y2="15"/>
+        <!-- Home Dashboard -->
+        <div id="home" class="page">
+            <div class="page-header">
+                <h2 class="page-title" data-i18n="dashboard">控制面板</h2>
+                <button class="icon-btn" onclick="showProfile()">
+                    <!-- User Icon -->
+                    <svg viewBox="0 0 24 24" fill="currentColor" style="width: 28px; height: 28px;">
+                        <path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm0 3c1.66 0 3 1.34 3 3s-1.34 3-3 3-3-1.34-3-3 1.34-3 3-3zm0 14.2c-2.5 0-4.71-1.28-6-3.22.03-1.99 4-3.08 6-3.08 1.99 0 5.97 1.09 6 3.08-1.29 1.94-3.5 3.22-6 3.22z"/>
                     </svg>
                 </button>
             </div>
+            
+            <div class="home-content">
+            <!-- Hero Stats -->
+            <div class="stats-hero">
+                <div class="hero-stat">
+                    <div class="hero-icon">
+                        <!-- Thunder/Lightning Icon -->
+                        <svg viewBox="0 0 24 24" fill="currentColor" style="width: 48px; height: 48px; margin-bottom: 8px; opacity: 0.8;">
+                            <path d="M7 2v11h3v9l7-12h-4l4-8z"/>
+                        </svg>
+                    </div>
+                    <div class="hero-value" id="avgShootingSpeed">0s</div>
+                    <div class="hero-label" data-i18n="avgShootingSpeed">平均投篮速度</div>
+                </div>
+            </div>
+            
+            <!-- Compact Stats Grid -->
+            <div class="stats-grid">
+                <div class="stat-card">
+                    <div class="stat-icon">
+                        <!-- Target Icon -->
+                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5">
+                            <circle cx="12" cy="12" r="10"/>
+                            <circle cx="12" cy="12" r="6"/>
+                            <circle cx="12" cy="12" r="2"/>
+                        </svg>
+                    </div>
+                    <div class="stat-value" id="totalShots">0</div>
+                    <div class="stat-label" data-i18n="totalShots">总投篮数</div>
+                </div>
+                
+                <div class="stat-card">
+                    <div class="stat-icon">
+                        <!-- Accuracy/Bullseye Icon -->
+                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                            <circle cx="12" cy="12" r="10"/>
+                            <circle cx="12" cy="12" r="6"/>
+                            <circle cx="12" cy="12" r="2" fill="currentColor"/>
+                            <path d="M12 2v4M12 18v4M2 12h4M18 12h4" stroke-width="1.5"/>
+                        </svg>
+                    </div>
+                    <div class="stat-value" id="shootingAccuracy">0%</div>
+                    <div class="stat-label" data-i18n="shootingAccuracy">投篮准确率</div>
+                </div>
+                
+                <div class="stat-card">
+                    <div class="stat-icon">
+                        <!-- Calendar/Week Icon -->
+                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                            <rect x="3" y="4" width="18" height="18" rx="2" ry="2"/>
+                            <line x1="16" y1="2" x2="16" y2="6"/>
+                            <line x1="8" y1="2" x2="8" y2="6"/>
+                            <line x1="3" y1="10" x2="21" y2="10"/>
+                            <circle cx="8" cy="16" r="1.5" fill="currentColor"/>
+                            <circle cx="12" cy="16" r="1.5" fill="currentColor"/>
+                            <circle cx="16" cy="16" r="1.5" fill="currentColor"/>
+                        </svg>
+                    </div>
+                    <div class="stat-value" id="avgShotsPerWeek">0</div>
+                    <div class="stat-label" data-i18n="shotsPerWeek">每周投篮</div>
+                </div>
+                
+                <div class="stat-card">
+                    <div class="stat-icon">
+                        <!-- Fire Icon -->
+                        <svg viewBox="0 0 24 24" fill="currentColor">
+                            <path d="M19 12c0-2.5-1-4.5-2.5-6s-2-3-2-3-1.5 1.5-3 3S9 9.5 9 12c0 1.5.5 3 1.5 4S13 18 14 18s2.5-.5 3.5-1.5S19 13.5 19 12zm-4 0c0 1.5-.5 2-1 2s-1-.5-1-2 .5-3 1-3 1 1.5 1 3zM8.5 17c-.5-.5-1-1.5-1-2.5 0-1.5.5-3 1.5-4.5C10 8.5 11 7 11 7s.5.5 1 1.5c.5 1 1 2 1 2s-.5.5-1 1.5S10.5 14 10.5 15c0 .5.5 1 1 1.5s1 .5 1 .5-1 0-2-.5C9.5 16 8.5 17 8.5 17z"/>
+                        </svg>
+                    </div>
+                    <div class="stat-value" id="currentStreak">0</div>
+                    <div class="stat-label" data-i18n="streak">连续天数</div>
+                </div>
+            </div>
+            
+            <!-- Recent Shots Section -->
+            <div class="recent-section">
+                <div class="section-header">
+                    <h3 class="section-title" data-i18n="recentShots">最近投篮</h3>
+                    <a href="#" onclick="navigateTo('replays')" class="see-all-btn" data-i18n="seeAll">查看全部</a>
+                </div>
+                <div id="recentShots" class="recent-shots">
+                    <!-- Shot cards will be dynamically loaded here -->
+                    <div class="empty-state">
+                        <p data-i18n="noShotsYet">还没有投篮记录。开始训练吧！</p>
+                    </div>
+                </div>
+            </div>
+            </div>
+            
+        </div>
 
-            <div class="body-heatmap">
-                <svg class="body-svg" viewBox="0 0 200 400" xmlns="http://www.w3.org/2000/svg">
-                    <!-- Head -->
-                    <circle cx="100" cy="40" r="25" fill="none" stroke="#1A1A1A" stroke-width="2"/>
+        <!-- Training Setup Page -->
+        <div id="trainingSetup" class="page">
+            <div class="page-header">
+                <h2 class="page-title" data-i18n="trainingSetup">训练设置</h2>
+            </div>
+            
+            <div class="training-setup-content">
+                <h3 class="setup-section-title" data-i18n="chooseTrainingMode">选择训练模式</h3>
+                
+                <div class="training-modes">
+                    <div class="training-mode-card" onclick="selectTrainingMode('shots')">
+                        <div class="mode-icon">
+                            <svg viewBox="0 0 24 24" fill="currentColor">
+                                <circle cx="12" cy="12" r="9" stroke="currentColor" stroke-width="2" fill="none"/>
+                                <path d="M12 3C12 3 12 21 12 21" stroke="currentColor" stroke-width="2"/>
+                                <path d="M3 12C3 12 21 12 21 12" stroke="currentColor" stroke-width="2"/>
+                            </svg>
+                        </div>
+                        <h4 class="mode-title" data-i18n="shotCount">投篮计数</h4>
+                        <p class="mode-description" data-i18n="completeShotsDesc">完成指定数量的投篮</p>
+                        <div class="mode-input" id="shotsInput" style="display: none;">
+                            <input type="number" class="form-input" placeholder="投篮次数" data-i18n-placeholder="numberOfShots" value="10" min="1" max="100" id="targetShots">
+                        </div>
+                    </div>
                     
-                    <!-- Body sections with IDs for heatmap -->
-                    <!-- Below knee -->
-                    <path id="section-shin" d="M80 280 L75 350 L85 350 L90 280" fill="none" stroke="#1A1A1A" stroke-width="2" class="body-section"/>
-                    <path id="section-shin2" d="M110 280 L115 350 L125 350 L120 280" fill="none" stroke="#1A1A1A" stroke-width="2" class="body-section"/>
+                    <div class="training-mode-card" onclick="selectTrainingMode('time')">
+                        <div class="mode-icon">
+                            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5">
+                                <circle cx="12" cy="12" r="10"/>
+                                <polyline points="12 6 12 12 16 14"/>
+                            </svg>
+                        </div>
+                        <h4 class="mode-title" data-i18n="timeTrial">计时挑战</h4>
+                        <p class="mode-description" data-i18n="shootManyDesc">在限定时间内尽可能多地投篮</p>
+                        <div class="mode-input" id="timeInput" style="display: none;">
+                            <select class="form-input" id="targetTime">
+                                <option value="30">30 秒</option>
+                                <option value="60" selected>1 分钟</option>
+                                <option value="120">2 分钟</option>
+                                <option value="180">3 分钟</option>
+                                <option value="300">5 分钟</option>
+                            </select>
+                        </div>
+                    </div>
                     
-                    <!-- Above knee to hip -->
-                    <path id="section-thigh" d="M90 200 L80 280 L90 280 L95 200" fill="none" stroke="#1A1A1A" stroke-width="2" class="body-section"/>
-                    <path id="section-thigh2" d="M105 200 L110 280 L120 280 L110 200" fill="none" stroke="#1A1A1A" stroke-width="2" class="body-section"/>
-                    
-                    <!-- Trunk -->
-                    <rect id="section-trunk" x="70" y="100" width="60" height="100" rx="10" fill="none" stroke="#1A1A1A" stroke-width="2" class="body-section"/>
-                    
-                    <!-- Shoulder to elbow -->
-                    <path id="section-upperarm" d="M70 110 L50 170 L60 175 L75 115" fill="none" stroke="#1A1A1A" stroke-width="2" class="body-section"/>
-                    <path id="section-upperarm2" d="M130 110 L150 170 L140 175 L125 115" fill="none" stroke="#1A1A1A" stroke-width="2" class="body-section"/>
-                    
-                    <!-- Elbow to wrist -->
-                    <path id="section-forearm" d="M50 170 L40 230 L50 232 L58 172" fill="none" stroke="#1A1A1A" stroke-width="2" class="body-section"/>
-                    <path id="section-forearm2" d="M150 170 L160 230 L150 232 L142 172" fill="none" stroke="#1A1A1A" stroke-width="2" class="body-section"/>
-                    
-                    <!-- Fadeaway pose indication -->
-                    <path d="M100 350 Q90 340, 85 330" stroke="#1A1A1A" stroke-width="1" stroke-dasharray="2,2" opacity="0.5"/>
-                    <circle cx="165" cy="220" r="15" fill="none" stroke="#1A1A1A" stroke-width="1" stroke-dasharray="2,2" opacity="0.5"/>
-                </svg>
+                    <div class="training-mode-card" onclick="selectTrainingMode('free')">
+                        <div class="mode-icon">
+                            <svg viewBox="0 0 24 24" fill="currentColor">
+                                <path d="M19 12c0-2.5-1-4.5-2.5-6s-2-3-2-3-1.5 1.5-3 3S9 9.5 9 12c0 1.5.5 3 1.5 4S13 18 14 18s2.5-.5 3.5-1.5S19 13.5 19 12z"/>
+                            </svg>
+                        </div>
+                        <h4 class="mode-title" data-i18n="freePractice">自由练习</h4>
+                        <p class="mode-description" data-i18n="practiceNoLimits">无限制练习</p>
+                    </div>
+                </div>
+                
+                <div class="training-presets">
+                    <h3 class="setup-section-title"><span data-i18n="proMode">专业模式</span> <span style="font-size: var(--font-sm); color: var(--text-tertiary); font-weight: normal;" data-i18n="waitingDevelopment">(待开发)</span></h3>
+                    <div class="preset-cards">
+                        <div class="preset-card" onclick="applyPreset('stability')">
+                            <div class="preset-icon">🎯</div>
+                            <div class="preset-info">
+                                <h5 class="preset-title" data-i18n="shootingStability">投篮稳定性训练</h5>
+                                <p class="preset-description" data-i18n="stabilityDesc">专注于躯干的稳定 每一次投篮尽可能保持一致 以及重心的微小变化</p>
+                            </div>
+                        </div>
+                        
+                        <div class="preset-card" onclick="applyPreset('speed')">
+                            <div class="preset-icon">⚡</div>
+                            <div class="preset-info">
+                                <h5 class="preset-title" data-i18n="releaseSpeed">出手速度训练</h5>
+                                <p class="preset-description" data-i18n="speedDesc">用尽可能快的方式出手 同时保持命中率 专注于比赛时的对抗出手速度</p>
+                            </div>
+                        </div>
+                        
+                        <div class="preset-card" onclick="applyPreset('efficiency')">
+                            <div class="preset-icon">💪</div>
+                            <div class="preset-info">
+                                <h5 class="preset-title" data-i18n="powerEfficiency">发力效率训练</h5>
+                                <p class="preset-description" data-i18n="efficiencyDesc">以最高效的形式发力 专注于用最少的能量完成投篮</p>
+                            </div>
+                        </div>
+                    </div>
+                    <p style="text-align: center; color: var(--text-tertiary); font-size: var(--font-sm); margin-top: var(--space-md);" data-i18n="proModeNote">* 专业模式将使用不同的算法进行分析（功能开发中）</p>
+                </div>
+                
+                <button class="btn-primary start-training-btn" onclick="startTrainingWithSettings()" disabled>
+                    <span class="btn-text" data-i18n="selectTrainingMode">选择训练模式</span>
+                </button>
             </div>
         </div>
 
-        <!-- Community Page -->
-        <div id="communityPage" class="page">
-            <h2 class="page-title">Locker Room</h2>
-            <div class="community-feed">
-                <!-- Community posts will be dynamically loaded here -->
-                <div class="empty-state">
-                    <p>No posts yet. Be the first to share!</p>
-                </div>
+        <!-- Training Instructions Page -->
+        <div id="trainingInstructions" class="page">
+            <div class="page-header">
+                <h2 class="page-title" data-i18n="getReady">准备就绪</h2>
             </div>
-        </div>
-
-        <!-- Replay Page -->
-        <div id="replayPage" class="page">
-            <h2 class="page-title">Shot Replays</h2>
-            <div class="replay-grid">
-                <!-- Replay videos will be dynamically loaded here -->
-                <div class="empty-state">
-                    <p>No replays yet. Start training to see your shots!</p>
+            
+            <div class="instructions-content">
+                <div class="instruction-icon">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                        <path d="M12 2a9 9 0 0 0-9 9c0 4 3 7 3 7h12s3-3 3-7a9 9 0 0 0-9-9z"/>
+                        <circle cx="12" cy="11" r="3"/>
+                        <path d="M12 14v7"/>
+                        <path d="M9 22h6"/>
+                        <path d="M15 5l2-2"/>
+                        <path d="M9 5L7 3"/>
+                    </svg>
                 </div>
+                
+                <h3 class="instruction-title" data-i18n="importantInstructions">重要说明</h3>
+                
+                <div class="instruction-card">
+                    <div class="instruction-number">1</div>
+                    <div class="instruction-text">
+                        <h4 id="shootingSideTitle" data-i18n="shootRightSide">从惯用手同侧录像</h4>
+                        <p id="shootingSideDesc" data-i18n="shootRightDesc">我们的AI追踪您的投篮手动作。确保投篮手的那一边对着摄像头可见。从侧面90度拍摄最佳。</p>
+                    </div>
+                </div>
+                
+                <div class="instruction-card">
+                    <div class="instruction-number">2</div>
+                    <div class="instruction-text">
+                        <h4 data-i18n="properDistance">保持适当位置</h4>
+                        <p data-i18n="properDistanceDesc">使您的全身完全在摄像头的画面内，并且在头部留有空余为起跳后的手腕检测留足空间。</p>
+                    </div>
+                </div>
+                
+                <div class="instruction-card">
+                    <div class="instruction-number">3</div>
+                    <div class="instruction-text">
+                        <h4 data-i18n="goodLighting">良好照明</h4>
+                        <p data-i18n="goodLightingDesc">确保充足的照明以准确追踪动作。</p>
+                    </div>
+                </div>
+                
+                <div class="ready-section">
+                    <div class="mode-reminder">
+                        <span class="mode-label" data-i18n="mode">模式：</span>
+                        <span class="mode-value" id="modeReminder">-</span>
+                    </div>
+                    <div class="target-reminder" id="targetReminder">
+                        <!-- Target info will be inserted here -->
+                    </div>
+                </div>
+                
+                <button class="btn-primary ready-btn" onclick="proceedToCamera()">
+                    <span data-i18n="imReady">我准备好了</span>
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="width: 20px; height: 20px; margin-left: 8px;">
+                        <polyline points="9 18 15 12 9 6"/>
+                    </svg>
+                </button>
             </div>
         </div>
 
         <!-- Training Page -->
-        <div id="trainingPage" class="page">
+        <div id="training" class="page">
             <div class="training-container">
-                <div id="videoContainer" class="video-container">
-                    <!-- MediaPipe camera will be loaded here -->
+                <div class="training-header">
+                    <button class="back-btn" onclick="exitTraining()">
+                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                            <path d="M19 12H5M12 19l-7-7 7-7"/>
+                        </svg>
+                    </button>
+                    <div class="training-status" id="trainingStatus" data-i18n="initializingCamera">正在初始化摄像头...</div>
+                </div>
+                
+                <div class="video-container">
+                    <video id="video" autoplay playsinline></video>
+                    <canvas id="canvas"></canvas>
+                    
+                    <div class="shot-overlay">
+                        <div class="shot-counter-large" id="shotCounterLarge"></div>
+                    </div>
+                    
+                    <!-- Body Parts Indicators -->
+                    <div class="body-parts-indicators">
+                        <div class="joint-indicator" data-joint="wrist">
+                            <span class="joint-icon">✋</span>
+                            <span class="joint-name">Wrist</span>
+                        </div>
+                        <div class="joint-indicator" data-joint="elbow">
+                            <span class="joint-icon">💪</span>
+                            <span class="joint-name">Elbow</span>
+                        </div>
+                        <div class="joint-indicator" data-joint="shoulder">
+                            <span class="joint-icon">🤷</span>
+                            <span class="joint-name">Shoulder</span>
+                        </div>
+                        <div class="joint-indicator" data-joint="hip">
+                            <span class="joint-icon">🦴</span>
+                            <span class="joint-name">Hip</span>
+                        </div>
+                        <div class="joint-indicator" data-joint="knee">
+                            <span class="joint-icon">🦵</span>
+                            <span class="joint-name">Knee</span>
+                        </div>
+                        <div class="joint-indicator" data-joint="ankle">
+                            <span class="joint-icon">🦶</span>
+                            <span class="joint-name">Ankle</span>
+                        </div>
+                    </div>
+                    
+                    <!-- Countdown Overlay -->
+                    <div id="countdownOverlay" class="countdown-overlay">
+                        <div class="countdown-content">
+                            <div id="countdownNumber" class="countdown-number"></div>
+                        </div>
+                    </div>
+                    
+                    <!-- Debug Panel -->
+                    <div id="debugPanel" style="display: none;">
+                        <div>Pose Detected: <span id="poseDetected">No</span></div>
+                        <div>Wrist Above Nose: <span id="wristAboveNose">No</span></div>
+                        <div>Current Angle: <span id="currentAngle">-</span>°</div>
+                        <div>Past -90°: <span id="past90Degrees">No</span></div>
+                        <div>Angular Velocity: <span id="angleVelocity">0</span>°/s</div>
+                        <div>Detection State: <span id="detectionState">Idle</span></div>
+                        <div>Shot Detected: <span id="shotDetected">-</span></div>
+                        <div>Shot Duration: <span id="shotDuration">-</span>s</div>
+                        <div>FPS: <span id="debugFPS">0</span></div>
+                    </div>
+                </div>
+                
+                <div class="training-controls">
+                    <div class="training-stat">
+                        <div class="training-stat-value" id="sessionShots">0</div>
+                        <div class="training-stat-label" data-i18n="shots">投篮</div>
+                    </div>
+                    
+                    <button class="stop-btn" onclick="stopTraining()">
+                        <svg viewBox="0 0 24 24" fill="currentColor">
+                            <rect x="6" y="6" width="12" height="12"/>
+                        </svg>
+                    </button>
+                    
+                    <div class="training-stat">
+                        <div class="training-stat-value" id="trainingTimer">00:00</div>
+                        <div class="training-stat-label" data-i18n="time">时间</div>
+                    </div>
                 </div>
             </div>
         </div>
 
-        <!-- Analytics Page -->
-        <div id="analyticsPage" class="page">
-            <h2 class="page-title">Performance Analytics</h2>
-            <div class="analytics-dashboard">
-                <!-- Charts will be dynamically loaded here -->
-                <div class="empty-state">
-                    <p>Start training to see your analytics!</p>
+        <!-- Replays Page -->
+        <div id="replays" class="page">
+            <div class="page-header">
+                <h2 class="page-title" data-i18n="trainingSessions">训练记录</h2>
+                <button id="editButton" class="icon-btn" onclick="toggleEditMode()" style="display: none;">
+                    <svg viewBox="0 0 24 24" fill="currentColor" style="width: 24px; height: 24px;">
+                        <path d="M3 17.25V21h3.75L17.81 9.94l-3.75-3.75L3 17.25zM20.71 7.04c.39-.39.39-1.02 0-1.41l-2.34-2.34c-.39-.39-1.02-.39-1.41 0l-1.83 1.83 3.75 3.75 1.83-1.83z"/>
+                    </svg>
+                </button>
+            </div>
+            
+            <!-- Batch Action Bar -->
+            <div id="batchActionBar" class="batch-action-bar" style="display: none;">
+                <div class="batch-action-left">
+                    <button class="batch-select-all" onclick="selectAllSessions()">
+                        <span data-i18n="selectAll">全选</span>
+                    </button>
+                    <span class="batch-count" id="batchCount">0 已选择</span>
+                </div>
+                <div class="batch-action-right">
+                    <button class="batch-cancel" onclick="cancelEditMode()">
+                        <span data-i18n="cancel">取消</span>
+                    </button>
+                    <button class="batch-delete" onclick="deleteSelectedSessions()">
+                        <svg viewBox="0 0 24 24" fill="currentColor" style="width: 20px; height: 20px; margin-right: 4px;">
+                            <path d="M6 19c0 1.1.9 2 2 2h8c1.1 0 2-.9 2-2V7H6v12zM19 4h-3.5l-1-1h-5l-1 1H5v2h14V4z"/>
+                        </svg>
+                        <span data-i18n="delete">删除</span>
+                    </button>
+                </div>
+            </div>
+            
+            <!-- Sessions View -->
+            <div id="sessionsView" class="sessions-container">
+                <div id="sessionsList" class="sessions-list">
+                    <!-- Sessions will be dynamically loaded here -->
+                    <div class="empty-state">
+                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" class="empty-icon">
+                            <rect x="3" y="3" width="18" height="18" rx="2" ry="2"/>
+                            <circle cx="8.5" cy="8.5" r="1.5"/>
+                            <polyline points="21 15 16 10 5 21"/>
+                        </svg>
+                        <p class="empty-text" data-i18n="noSessionsYet">还没有训练记录！</p>
+                    </div>
+                </div>
+            </div>
+            
+            <!-- Session Details View (hidden by default) -->
+            <div id="sessionDetailsView" class="session-details-container" style="display: none;">
+                <div class="session-details-header">
+                    <button class="back-btn" onclick="backToSessions()">
+                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                            <path d="M19 12H5M12 19l-7-7 7-7"/>
+                        </svg>
+                    </button>
+                    <h3 class="session-title" id="sessionTitle" data-i18n="sessionDetails">训练详情</h3>
+                    <div class="view-toggle">
+                        <button id="listViewBtn" class="view-btn" onclick="setViewMode('list')" title="List View">
+                            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                <path d="M8 6h13M8 12h13M8 18h13M3 6h.01M3 12h.01M3 18h.01"/>
+                            </svg>
+                        </button>
+                        <button id="gridViewBtn" class="view-btn active" onclick="setViewMode('grid')" title="Grid View">
+                            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                <rect x="3" y="3" width="7" height="7"/>
+                                <rect x="14" y="3" width="7" height="7"/>
+                                <rect x="3" y="14" width="7" height="7"/>
+                                <rect x="14" y="14" width="7" height="7"/>
+                            </svg>
+                        </button>
+                    </div>
+                </div>
+                
+                <div id="sessionShotsList" class="replays-container grid-view">
+                    <!-- Session shots will be loaded here -->
                 </div>
             </div>
         </div>
 
-        <!-- Settings Page -->
-        <div id="settingsPage" class="page">
-            <h2 class="page-title">Profile & Settings</h2>
-            <div class="settings-content">
-                <div class="form-group">
-                    <label class="form-label">Name</label>
-                    <input type="text" class="form-input" id="userName" placeholder="Your name">
+        <!-- Profile Page -->
+        <div id="profile" class="page">
+            <div class="page-header">
+                <button class="back-btn" onclick="hideProfile()">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                        <path d="M19 12H5M12 19l-7-7 7-7"/>
+                    </svg>
+                </button>
+                <h2 class="page-title" data-i18n="profile">个人资料</h2>
+            </div>
+            
+            <div class="profile-header">
+                <div class="profile-avatar">
+                    <svg viewBox="0 0 24 24" fill="currentColor">
+                        <path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm0 3c1.66 0 3 1.34 3 3s-1.34 3-3 3-3-1.34-3-3 1.34-3 3-3zm0 14.2c-2.5 0-4.71-1.28-6-3.22.03-1.99 4-3.08 6-3.08 1.99 0 5.97 1.09 6 3.08-1.29 1.94-3.5 3.22-6 3.22z"/>
+                    </svg>
                 </div>
-                <div class="form-group">
-                    <label class="form-label">Height</label>
-                    <input type="text" class="form-input" id="userHeight" placeholder="e.g., 6'2\"">
+                <h3 class="profile-name" id="profileName">User</h3>
+                <p class="profile-info" id="profileEmail">email@example.com</p>
+                <div class="profile-badge" id="profileBadge">Elite Player #1</div>
+            </div>
+            
+            <div class="profile-content">
+                <div class="profile-section">
+                    <h4 class="section-title" data-i18n="language">语言</h4>
+                    <div class="language-selector">
+                        <button class="language-btn active" id="langZh" onclick="changeLanguage('zh')">
+                            <span class="lang-flag">🇨🇳</span>
+                            <span data-i18n="chinese">中文</span>
+                        </button>
+                        <button class="language-btn" id="langEn" onclick="changeLanguage('en')">
+                            <span class="lang-flag">🇺🇸</span>
+                            <span data-i18n="english">English</span>
+                        </button>
+                    </div>
                 </div>
-                <div class="form-group">
-                    <label class="form-label">Position</label>
-                    <select class="form-input" id="userPosition">
-                        <option value="">Select position</option>
-                        <option value="PG">Point Guard</option>
-                        <option value="SG">Shooting Guard</option>
-                        <option value="SF">Small Forward</option>
-                        <option value="PF">Power Forward</option>
-                        <option value="C">Center</option>
-                    </select>
+                
+                <div class="profile-section">
+                    <h4 class="section-title" data-i18n="shootingHand">投篮惯用手</h4>
+                    <div class="hand-selector">
+                        <button class="hand-btn active" id="handRight" onclick="changeShootingHand('right')">
+                            <span class="hand-icon">✋</span>
+                            <span data-i18n="rightHand">右手</span>
+                        </button>
+                        <button class="hand-btn" id="handLeft" onclick="changeShootingHand('left')">
+                            <span class="hand-icon">🤚</span>
+                            <span data-i18n="leftHand">左手</span>
+                        </button>
+                    </div>
                 </div>
-                <div class="form-group">
-                    <label class="form-label">Shooting Hand</label>
-                    <select class="form-input" id="shootingHand">
-                        <option value="right">Right</option>
-                        <option value="left">Left</option>
-                    </select>
+                
+                <div class="profile-section">
+                    <button class="btn-secondary flex items-center justify-center gap-md" onclick="shareApp()">
+                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" class="section-icon">
+                            <circle cx="18" cy="5" r="3"/>
+                            <circle cx="6" cy="12" r="3"/>
+                            <circle cx="18" cy="19" r="3"/>
+                            <line x1="8.59" y1="13.51" x2="15.42" y2="17.49"/>
+                            <line x1="15.41" y1="6.51" x2="8.59" y2="10.49"/>
+                        </svg>
+                        <span data-i18n="shareApp">分享应用</span>
+                    </button>
                 </div>
-                <button class="btn btn-secondary" onclick="logout()" style="width: 100%; margin-top: 32px;">Log Out</button>
+                
+                <div class="profile-section">
+                    <button class="btn-danger flex items-center justify-center gap-md" onclick="logout()">
+                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" class="section-icon">
+                            <path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"/>
+                            <polyline points="16 17 21 12 16 7"/>
+                            <line x1="21" y1="12" x2="9" y2="12"/>
+                        </svg>
+                        Log Out
+                    </button>
+                </div>
+                
+                <div class="text-center mt-lg">
+                    <p style="color: var(--text-tertiary); font-size: var(--font-sm);" data-i18n="version">投篮教练精英版 v2.0</p>
+                    <p style="color: var(--text-tertiary); font-size: var(--font-sm);" data-i18n="poweredBy">由 MediaPipe 提供支持</p>
+                </div>
             </div>
         </div>
 
         <!-- Navigation Bar -->
-        <nav class="nav-bar" id="navBar" style="display: none;">
-            <div class="nav-item" onclick="navigateTo('community')">
-                <svg class="nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                    <path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/>
-                    <circle cx="12" cy="7" r="4"/>
+        <nav id="navbar" class="navbar" style="display: none;">
+            <button class="nav-item active" onclick="navigateTo('home')">
+                <!-- Home Icon -->
+                <svg viewBox="0 0 24 24" fill="currentColor">
+                    <path d="M10 20v-6h4v6h5v-8h3L12 3 2 12h3v8z"/>
                 </svg>
-                <span class="nav-label">Locker Room</span>
-            </div>
-            <div class="nav-item" onclick="navigateTo('replay')">
-                <svg class="nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                    <polygon points="5 3 19 12 5 21 5 3"/>
+                <span class="nav-label" data-i18n="home">主页</span>
+            </button>
+            
+            <button class="nav-item" onclick="navigateTo('trainingSetup')">
+                <!-- Basketball Icon -->
+                <svg viewBox="0 0 24 24" fill="currentColor">
+                    <circle cx="12" cy="12" r="9" stroke="currentColor" stroke-width="2" fill="none"/>
+                    <path d="M12 3C12 3 12 21 12 21" stroke="currentColor" stroke-width="2"/>
+                    <path d="M3 12C3 12 21 12 21 12" stroke="currentColor" stroke-width="2"/>
+                    <path d="M6.5 6.5C8.5 8.5 8.5 15.5 6.5 17.5" stroke="currentColor" stroke-width="2"/>
+                    <path d="M17.5 6.5C15.5 8.5 15.5 15.5 17.5 17.5" stroke="currentColor" stroke-width="2"/>
                 </svg>
-                <span class="nav-label">Replays</span>
-            </div>
-            <div class="nav-item active" onclick="navigateTo('training')">
-                <svg class="nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                    <circle cx="12" cy="12" r="10" stroke-width="1.5"/>
-                    <path d="M12 8v8M8 12h8" stroke-width="2"/>
+                <span class="nav-label" data-i18n="train">训练</span>
+            </button>
+            
+            <button class="nav-item" onclick="navigateTo('replays')">
+                <!-- Video Icon -->
+                <svg viewBox="0 0 24 24" fill="currentColor">
+                    <path d="M17 10.5V7c0-.55-.45-1-1-1H4c-.55 0-1 .45-1 1v10c0 .55.45 1 1 1h12c.55 0 1-.45 1-1v-3.5l4 4v-11l-4 4z"/>
                 </svg>
-                <span class="nav-label">Train</span>
-            </div>
-            <div class="nav-item" onclick="navigateTo('analytics')">
-                <svg class="nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                    <line x1="18" y1="20" x2="18" y2="10"/>
-                    <line x1="12" y1="20" x2="12" y2="4"/>
-                    <line x1="6" y1="20" x2="6" y2="14"/>
-                </svg>
-                <span class="nav-label">Analytics</span>
-            </div>
-            <div class="nav-item" onclick="navigateTo('settings')">
-                <svg class="nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                    <path d="M12 2L12 8M12 8L7 5M12 8L17 5"/>
-                    <rect x="7" y="10" width="10" height="12" rx="2"/>
-                    <circle cx="12" cy="16" r="2"/>
-                </svg>
-                <span class="nav-label">Profile</span>
-            </div>
+                <span class="nav-label" data-i18n="replays">回放</span>
+            </button>
         </nav>
 
+        <!-- Video Modal -->
+        <div id="videoModal" class="modal">
+            <div class="modal-content">
+                <button class="modal-close" onclick="closeVideoModal()">×</button>
+                <video id="modalVideo" controls style="width: 100%; max-height: 80vh;"></video>
+                <div class="playback-speed-control">
+                    <button class="speed-btn" data-speed="0.25" onclick="setPlaybackSpeed(0.25)">0.25x</button>
+                    <button class="speed-btn" data-speed="0.5" onclick="setPlaybackSpeed(0.5)">0.5x</button>
+                    <button class="speed-btn" data-speed="0.75" onclick="setPlaybackSpeed(0.75)">0.75x</button>
+                    <button class="speed-btn active" data-speed="1" onclick="setPlaybackSpeed(1)">1x</button>
+                    <button class="speed-btn" data-speed="1.25" onclick="setPlaybackSpeed(1.25)">1.25x</button>
+                </div>
+                <div class="modal-stats" id="modalStats" style="padding: var(--space-lg); background: var(--bg-secondary);"></div>
+            </div>
+        </div>
     </div>
 
-    <script src="app-navigation.js"></script>
+    <!-- Supabase SDK -->
+    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+    
+    <!-- Camera Fix for PWA -->
+    <script src="pwa-camera-fix.js"></script>
+    
+    <!-- MediaPipe Scripts -->
+    <script src="https://cdn.jsdelivr.net/npm/@mediapipe/camera_utils/camera_utils.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/@mediapipe/control_utils/control_utils.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/@mediapipe/drawing_utils/drawing_utils.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/@mediapipe/pose/pose.js"></script>
+    
+    <!-- App Scripts -->
+    <script src="camera-helper.js"></script>
+    <script type="module" src="app-navigation.js?v=4.0" defer></script>
+    <script type="module" src="i18n.js" defer></script>
+    <script src="batch-selection.js" defer></script>
+    <link rel="stylesheet" href="pwa-installer.css">
+    <script src="pwa-installer.js" defer></script>
+    
+    <!-- Service Worker Registration -->
+    <script>
+        if ('serviceWorker' in navigator) {
+            window.addEventListener('load', () => {
+                navigator.serviceWorker.register('/service-worker.js')
+                    .then(registration => console.log('ServiceWorker registration successful:', registration.scope))
+                    .catch(err => console.log('ServiceWorker registration failed:', err));
+            });
+        }
+    </script>
 </body>
 </html>
