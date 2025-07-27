@@ -3374,6 +3374,41 @@ button:disabled {
         font-size: 16px !important;
     }
 }
+
+/* Auth Form Scrolling Fix */
+/* Login mode - no scrolling */
+#landing.login-mode {
+    overflow: hidden;
+    height: 100vh;
+    height: 100dvh;
+}
+
+#landing.login-mode .landing-content {
+    overflow: hidden;
+    max-height: 100vh;
+    max-height: 100dvh;
+}
+
+/* Signup mode - allow scrolling */
+#landing.signup-mode {
+    overflow-y: auto;
+    -webkit-overflow-scrolling: touch;
+    height: 100vh;
+    height: 100dvh;
+}
+
+#landing.signup-mode .landing-content {
+    overflow: visible;
+    min-height: 100vh;
+    min-height: 100dvh;
+    padding-bottom: env(safe-area-inset-bottom, 40px);
+}
+
+/* Ensure form wrapper expands in signup mode */
+#landing.signup-mode .auth-form-wrapper {
+    overflow: visible;
+    flex-shrink: 0;
+}
 /* Batch Selection and Delete Styles */
 .batch-action-bar {
     display: flex;

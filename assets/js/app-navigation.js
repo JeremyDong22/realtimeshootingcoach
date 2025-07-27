@@ -257,6 +257,12 @@ document.addEventListener('DOMContentLoaded', async () => {
     window.addEventListener('resize', updateViewportHeight);
     window.addEventListener('orientationchange', updateViewportHeight);
     
+    // Initialize landing page with login mode by default
+    const landingPage = document.getElementById('landing');
+    if (landingPage) {
+        landingPage.classList.add('login-mode');
+    }
+    
     // Initialize language
     const savedLang = getCurrentLanguage();
     if (savedLang === 'en') {
@@ -393,15 +399,22 @@ function setupEventListeners() {
             const nameGroup = document.getElementById('nameGroup');
             const handGroup = document.getElementById('handGroup');
             const submitBtn = document.getElementById('authSubmit');
+            const landingPage = document.getElementById('landing');
             
             if (mode === 'signup') {
                 nameGroup.style.display = 'block';
                 handGroup.style.display = 'block';
                 submitBtn.querySelector('.btn-text').textContent = t('signup');
+                // Add signup mode class for scrolling
+                landingPage.classList.remove('login-mode');
+                landingPage.classList.add('signup-mode');
             } else {
                 nameGroup.style.display = 'none';
                 handGroup.style.display = 'none';
                 submitBtn.querySelector('.btn-text').textContent = t('login');
+                // Add login mode class to prevent scrolling
+                landingPage.classList.remove('signup-mode');
+                landingPage.classList.add('login-mode');
             }
         });
     });
