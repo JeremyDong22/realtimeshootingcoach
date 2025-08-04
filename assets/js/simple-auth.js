@@ -10,12 +10,23 @@ export const simpleAuth = {
     
     async signUp(emailOrPhone, password, name, shootingHand = 'right') {
         try {
+            // Validate input
+            if (!emailOrPhone || !password || !name) {
+                return { data: null, error: 'All fields are required' };
+            }
+            
             // Check if user already exists
-            const { data: existingUser } = await supabase
+            const { data: existingUser, error: checkError } = await supabase
                 .from('sc_simple_users')
                 .select('*')
                 .eq('email_or_phone', emailOrPhone)
                 .single();
+            
+            // Handle database connection errors
+            if (checkError && checkError.code !== 'PGRST116') { // PGRST116 = no rows found
+                console.error('Database error:', checkError);
+                return { data: null, error: 'Database connection error. Please check your connection.' };
+            }
             
             if (existingUser) {
                 return { data: null, error: 'User already exists with this email/phone' };
@@ -62,26 +73,38 @@ export const simpleAuth = {
     
     async signIn(emailOrPhone, password) {
         try {
-            // Find user by email/phone and password
-            const { data: user, error } = await supabase
+            // Validate input
+            if (!emailOrPhone || !password) {
+                return { data: null, error: 'Email/phone and password are required' };
+            }
+            
+            // First check if user exists
+            const { data: existingUser, error: checkError } = await supabase
                 .from('sc_simple_users')
                 .select('*')
                 .eq('email_or_phone', emailOrPhone)
-                .eq('password', password)
                 .single();
             
-            if (error || !user) {
+            // If error or no user found
+            if (checkError || !existingUser) {
+                console.error('User not found:', checkError);
+                return { data: null, error: 'Invalid email/phone or password' };
+            }
+            
+            // Verify password matches
+            if (existingUser.password !== password) {
                 return { data: null, error: 'Invalid email/phone or password' };
             }
             
             // Store user in session
-            this.currentUser = user;
-            sessionStorage.setItem('shootingCoachUser', JSON.stringify(user));
+            this.currentUser = existingUser;
+            sessionStorage.setItem('shootingCoachUser', JSON.stringify(existingUser));
             
-            return { data: user, error: null };
+            return { data: existingUser, error: null };
         } catch (error) {
             console.error('Sign in error:', error);
-            return { data: null, error: error.message };
+            // Always return authentication error, don't expose internal errors
+            return { data: null, error: 'Invalid email/phone or password' };
         }
     },
     

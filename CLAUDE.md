@@ -26,6 +26,11 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 - **Credential Management**:
   - We have Supabase credentials in the .env file and we always keep that in the .env file. Do not expose it to any of those JS files.
 
+## Deployment Notes
+
+- **Automatic Deployment**:
+  - If we push our code to Github, it will automatically deploy to Vercel.  
+
 ## Key Commands
 
 ```bash

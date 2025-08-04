@@ -785,7 +785,11 @@ async function handleAuth(e) {
         }
         
         if (result.error) {
-            alert(result.error.message);
+            // Show the error message from auth service
+            alert(result.error);
+        } else if (!result.data) {
+            // No user data returned - authentication failed
+            alert(getCurrentLanguage() === 'zh' ? '登录失败，请检查邮箱/手机号和密码' : 'Login failed, please check your email/phone and password');
         } else {
             state.user = result.data;
             // User is saved in Supabase, no need for localStorage
