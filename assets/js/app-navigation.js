@@ -190,8 +190,17 @@ class CameraHelper {
             document.getElementById('canvas').classList.remove('mirror');
         }
         
+        // Mobile-optimized constraints
+        const isMobile = /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent);
+        
         const constraints = {
-            video: {
+            video: isMobile ? {
+                // Simpler constraints for mobile
+                facingMode: this.facingMode,
+                width: { ideal: 1280, min: 640 },
+                height: { ideal: 720, min: 480 }
+            } : {
+                // Desktop constraints
                 width: { ideal: options.width || 1280 },
                 height: { ideal: options.height || 720 },
                 facingMode: this.facingMode
@@ -199,11 +208,21 @@ class CameraHelper {
             audio: false
         };
         
+        console.log('📱 Mobile device:', isMobile);
+        console.log('🎥 Camera constraints:', constraints);
+        
         try {
             // Add timeout for camera initialization
             const initTimeout = new Promise((_, reject) => {
                 setTimeout(() => reject(new Error('CAMERA_INIT_TIMEOUT')), 10000);
             });
+            
+            // First check if mediaDevices is available
+            if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
+                throw new Error('getUserMedia not supported');
+            }
+            
+            console.log('🔍 Requesting camera permission...');
             
             // Race between getUserMedia and timeout
             this.stream = await Promise.race([
@@ -211,7 +230,29 @@ class CameraHelper {
                 initTimeout
             ]);
             
+            console.log('✅ Camera stream obtained');
+            
             this.video.srcObject = this.stream;
+            
+            // Ensure video plays on mobile
+            this.video.setAttribute('playsinline', 'true');
+            this.video.setAttribute('webkit-playsinline', 'true');
+            this.video.setAttribute('muted', 'true');
+            this.video.muted = true;
+            
+            // Wait for video to be ready
+            await new Promise((resolve) => {
+                this.video.onloadedmetadata = () => {
+                    console.log('✅ Video metadata loaded');
+                    this.video.play().then(() => {
+                        console.log('✅ Video playing');
+                        resolve();
+                    }).catch(err => {
+                        console.error('❌ Video play error:', err);
+                        resolve(); // Continue anyway
+                    });
+                };
+            });
             
             // Setup Android freeze detection
             if (pwaUtils.platform.type === 'Android' && pwaUtils.isStandalone) {
@@ -1079,8 +1120,32 @@ async function initializeMediaPipe() {
         document.getElementById('trainingStatus').textContent = getCurrentLanguage() === 'zh' ? 
             '正在初始化姿势检测...' : 'Initializing pose detection...';
         
-        // Initialize pose asynchronously to avoid blocking
-        await state.pose.initialize();
+        try {
+            // Add timeout for MediaPipe initialization
+            const initTimeout = new Promise((_, reject) => {
+                setTimeout(() => reject(new Error('MediaPipe initialization timeout')), 15000);
+            });
+            
+            // Initialize pose with timeout
+            await Promise.race([
+                state.pose.initialize(),
+                initTimeout
+            ]);
+            
+            console.log('✅ MediaPipe initialized successfully');
+        } catch (poseError) {
+            console.error('❌ MediaPipe initialization failed:', poseError);
+            document.getElementById('trainingStatus').textContent = getCurrentLanguage() === 'zh' ? 
+                '姿势检测初始化失败，请刷新页面重试' : 'Pose detection failed, please refresh';
+            
+            // Show detailed error to help debugging
+            if (poseError.message.includes('timeout')) {
+                alert(getCurrentLanguage() === 'zh' ? 
+                    '姿势检测加载超时\n\n可能的原因：\n1. 网络连接较慢\n2. 设备性能不足\n3. 浏览器不兼容\n\n请使用Chrome或Safari浏览器' :
+                    'Pose detection timeout\n\nPossible causes:\n1. Slow network\n2. Device performance\n3. Browser incompatibility\n\nPlease use Chrome or Safari');
+            }
+            throw poseError;
+        }
         
         // Initialize Camera
         const videoElement = document.getElementById('video');
@@ -1113,6 +1178,11 @@ async function initializeMediaPipe() {
             // Frame rate throttling for better performance
             let lastFrameTime = 0;
             const frameInterval = 1000 / 30; // Limit to 30fps for pose detection
+            
+            // Add detailed logging for mobile debugging
+            console.log('📱 Initializing camera...');
+            console.log('Platform:', navigator.userAgent);
+            console.log('HTTPS:', window.location.protocol === 'https:');
             
             await state.cameraHelper.initialize(videoElement, {
                 width: 1280,
@@ -1161,8 +1231,19 @@ async function initializeMediaPipe() {
                 lastTapTime = currentTime;
             }, { passive: true }); // Make listener passive for better scrolling performance
             
+            console.log('✅ Camera initialized successfully');
+            
+            // Update status for mobile users
+            document.getElementById('trainingStatus').textContent = getCurrentLanguage() === 'zh' ? 
+                '摄像头就绪' : 'Camera ready';
+                
         } catch (cameraError) {
-            console.error('Camera initialization failed:', cameraError);
+            console.error('❌ Camera initialization failed:', cameraError);
+            console.error('Error details:', {
+                name: cameraError.name,
+                message: cameraError.message,
+                stack: cameraError.stack
+            });
             
             // Get platform-specific recommendations
             const cameraCheck = pwaUtils.canAccessCamera();
@@ -1194,8 +1275,28 @@ async function initializeMediaPipe() {
                 }
             }
             
-            // Check for other common errors
-            if (cameraError.message === 'PERMISSION_DENIED') {
+            // Check for common mobile issues
+            if (cameraError.name === 'NotAllowedError' || cameraError.name === 'PermissionDeniedError') {
+                document.getElementById('trainingStatus').textContent = getCurrentLanguage() === 'zh' ? 
+                    '请允许摄像头权限' : 'Please allow camera permission';
+                
+                // Show mobile-specific instructions
+                const isMobile = /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent);
+                if (isMobile) {
+                    alert(getCurrentLanguage() === 'zh' ? 
+                        '摄像头权限被拒绝\n\n解决方法：\n1. 在浏览器设置中允许摄像头权限\n2. 或在系统设置中允许Chrome访问摄像头\n3. 刷新页面重试' :
+                        'Camera permission denied\n\nSolution:\n1. Allow camera in browser settings\n2. Or allow Chrome camera access in system settings\n3. Refresh the page');
+                }
+            } else if (cameraError.name === 'NotFoundError' || cameraError.name === 'DevicesNotFoundError') {
+                document.getElementById('trainingStatus').textContent = getCurrentLanguage() === 'zh' ? 
+                    '未检测到摄像头' : 'No camera detected';
+            } else if (cameraError.name === 'NotReadableError' || cameraError.name === 'TrackStartError') {
+                document.getElementById('trainingStatus').textContent = getCurrentLanguage() === 'zh' ? 
+                    '摄像头被其他应用占用' : 'Camera is used by another app';
+                alert(getCurrentLanguage() === 'zh' ? 
+                    '摄像头被占用\n\n请关闭其他使用摄像头的应用后重试' :
+                    'Camera is busy\n\nPlease close other apps using camera');
+            } else if (cameraError.message === 'PERMISSION_DENIED') {
                 document.getElementById('trainingStatus').textContent = getCurrentLanguage() === 'zh' ? 
                     '摄像头权限被拒绝' : 'Camera permission denied';
                 showCameraPermissionGuide();

@@ -1,6 +1,10 @@
 // Simple Auth Service
 // Simplified authentication using only sc_simple_users table
 // Matches your existing database structure
+// Updated: Modified shots service to use IndexedDB instead of Supabase for MVP
+// - getAllShots, getShots, getSessionShots now read from IndexedDB
+// - getStats calculates statistics from IndexedDB videos
+// - addShot, deleteShot, updateStats kept for compatibility but don't use Supabase
 
 import { supabase } from './supabase-client.js';
 
@@ -137,25 +141,23 @@ export const simpleAuth = {
     }
 };
 
-// Simplified shots service
+// Simplified shots service - using IndexedDB for MVP
 export const simpleShots = {
     async getAllShots() {
         try {
             const user = await simpleAuth.getUser();
             if (!user) return [];
             
-            const { data, error } = await supabase
-                .from('sc_shots')
-                .select('*')
-                .eq('user_id', user.id)
-                .order('created_at', { ascending: false });
+            // Get shots from IndexedDB instead of Supabase
+            if (window.getAllVideos) {
+                const videos = await window.getAllVideos();
+                // Filter videos for current user (if needed)
+                return videos || [];
+            }
             
-            if (error) throw error;
-            
-            return data || [];
+            return [];
         } catch (error) {
-            console.error('Error getting shots:', error);
-            // Return empty array if table doesn't exist yet
+            console.error('Error getting shots from IndexedDB:', error);
             return [];
         }
     },
@@ -165,20 +167,11 @@ export const simpleShots = {
             const user = await simpleAuth.getUser();
             if (!user) return { data: null, error: 'User not authenticated' };
             
-            const { data, error } = await supabase
-                .from('sc_shots')
-                .insert({
-                    ...shotData,
-                    user_id: user.id
-                })
-                .select()
-                .single();
-            
-            if (error) throw error;
-            
-            return { data, error: null };
+            // For MVP, shots are saved directly to IndexedDB in app-navigation.js
+            // This function is kept for compatibility but doesn't save to Supabase
+            return { data: shotData, error: null };
         } catch (error) {
-            console.error('Error adding shot:', error);
+            console.error('Error in addShot:', error);
             return { data: null, error: error.message };
         }
     },
@@ -188,18 +181,15 @@ export const simpleShots = {
             const user = await simpleAuth.getUser();
             if (!user) return [];
             
-            const { data, error } = await supabase
-                .from('sc_shots')
-                .select('*')
-                .eq('user_id', user.id)
-                .eq('session_id', sessionId)
-                .order('created_at', { ascending: false });
+            // Get shots from IndexedDB and filter by sessionId
+            if (window.getAllVideos) {
+                const videos = await window.getAllVideos();
+                return videos.filter(video => video.sessionId === sessionId) || [];
+            }
             
-            if (error) throw error;
-            
-            return data || [];
+            return [];
         } catch (error) {
-            console.error('Error getting session shots:', error);
+            console.error('Error getting session shots from IndexedDB:', error);
             return [];
         }
     },
@@ -209,23 +199,21 @@ export const simpleShots = {
             const user = await simpleAuth.getUser();
             if (!user) return { data: [], error: null };
             
-            let query = supabase
-                .from('sc_shots')
-                .select('*')
-                .eq('user_id', user.id)
-                .order('created_at', { ascending: false });
-            
-            if (limit) {
-                query = query.limit(limit);
+            // Get shots from IndexedDB
+            if (window.getAllVideos) {
+                let videos = await window.getAllVideos();
+                
+                // Apply limit if specified
+                if (limit) {
+                    videos = videos.slice(0, limit);
+                }
+                
+                return { data: videos || [], error: null };
             }
             
-            const { data, error } = await query;
-            
-            if (error) throw error;
-            
-            return { data: data || [], error: null };
+            return { data: [], error: null };
         } catch (error) {
-            console.error('Error getting shots:', error);
+            console.error('Error getting shots from IndexedDB:', error);
             return { data: [], error: error.message };
         }
     },
@@ -242,19 +230,38 @@ export const simpleShots = {
                 error: null
             };
             
-            // Get user stats from database
-            const { data: stats, error } = await supabase
-                .from('sc_user_stats')
-                .select('*')
-                .eq('user_id', user.id)
-                .single();
-            
-            if (error && error.code !== 'PGRST116') { // Ignore "no rows returned" error
-                console.error('Stats error:', error);
+            // Calculate stats from IndexedDB videos
+            if (window.getAllVideos) {
+                const videos = await window.getAllVideos();
+                
+                // Calculate total shots
+                const totalShots = videos.length;
+                
+                // Calculate average duration
+                const durations = videos
+                    .map(v => v.shotData?.duration || 0)
+                    .filter(d => d > 0);
+                const avgDuration = durations.length > 0 
+                    ? durations.reduce((a, b) => a + b, 0) / durations.length 
+                    : 0;
+                
+                // Calculate unique sessions
+                const uniqueSessions = new Set(
+                    videos.map(v => v.sessionId || `session-${v.timestamp}`)
+                ).size;
+                
+                return {
+                    data: {
+                        total_shots: totalShots,
+                        avg_duration: avgDuration,
+                        total_sessions: uniqueSessions
+                    },
+                    error: null
+                };
             }
             
             return {
-                data: stats || {
+                data: {
                     total_shots: 0,
                     avg_duration: 0,
                     total_sessions: 0
@@ -262,7 +269,7 @@ export const simpleShots = {
                 error: null
             };
         } catch (error) {
-            console.error('Error getting stats:', error);
+            console.error('Error calculating stats from IndexedDB:', error);
             return {
                 data: {
                     total_shots: 0,
@@ -279,59 +286,22 @@ export const simpleShots = {
             const user = await simpleAuth.getUser();
             if (!user) return { error: 'User not authenticated' };
             
-            const { error } = await supabase
-                .from('sc_shots')
-                .delete()
-                .eq('id', shotId)
-                .eq('user_id', user.id);
-            
-            if (error) throw error;
-            
+            // For MVP, deletion is handled directly in IndexedDB by app-navigation.js
+            // This function is kept for compatibility
             return { error: null };
         } catch (error) {
-            console.error('Error deleting shot:', error);
+            console.error('Error in deleteShot:', error);
             return { error: error.message };
         }
     },
     
     async updateStats(userId) {
         try {
-            // Calculate stats from shots table
-            const { data: shots, error: shotsError } = await supabase
-                .from('sc_shots')
-                .select('duration, session_id')
-                .eq('user_id', userId);
-            
-            if (shotsError) {
-                console.error('Error fetching shots for stats:', shotsError);
-                return { error: null }; // Don't fail, just skip
-            }
-            
-            const totalShots = shots?.length || 0;
-            const durations = (shots || []).map(s => s.duration).filter(d => d > 0);
-            const avgDuration = durations.length > 0 
-                ? durations.reduce((a, b) => a + b, 0) / durations.length 
-                : 0;
-            const uniqueSessions = new Set((shots || []).map(s => s.session_id).filter(id => id)).size;
-            
-            // Upsert stats
-            const { error } = await supabase
-                .from('sc_user_stats')
-                .upsert({
-                    user_id: userId,
-                    total_shots: totalShots,
-                    avg_duration: avgDuration,
-                    total_sessions: uniqueSessions,
-                    updated_at: new Date().toISOString()
-                });
-            
-            if (error) {
-                console.error('Error updating stats:', error);
-            }
-            
+            // For MVP, stats are calculated on-the-fly from IndexedDB
+            // This function is kept for compatibility but doesn't update Supabase
             return { error: null };
         } catch (error) {
-            console.error('Error updating stats:', error);
+            console.error('Error in updateStats:', error);
             return { error: error.message };
         }
     }
