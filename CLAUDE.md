@@ -129,3 +129,11 @@ The ONNX model (`basketballModel.onnx`) must be present in the root directory fo
 - Vercel/Netlify: Set environment variables in dashboard
 - Docker: Use provided Dockerfile and nginx.conf
 - Always run `npm run build` before deployment
+
+## Project Core Logic Preservation
+
+- **MediaPipe and Core Algorithm Stability**:
+  - Do not change anything of MediaPipe and the core algorithm until explicitly instructed
+  - This is the core logic of the application
+  - Any potential changes must be approached with extreme caution
+  - Preserve the complexity of the model to maintain core functionality

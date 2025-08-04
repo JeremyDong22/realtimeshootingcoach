@@ -1,6 +1,6 @@
-// Service Worker - Version 5.0
-// Enhanced for cross-platform PWA compatibility
-const CACHE_NAME = 'shooting-coach-v5-enhanced';
+// Service Worker - Version 7.0
+// Fixed IndexedDB usage for stats and shots
+const CACHE_NAME = 'shooting-coach-v7-fixed';
 const urlsToCache = [
   '/',
   '/index.html',

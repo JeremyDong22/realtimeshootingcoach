@@ -8,7 +8,7 @@
 // - Fixed service worker cache paths to match actual file structure
 // - Enhanced camera handling for cross-platform PWA compatibility
 // - Added Android freeze recovery and iOS PWA detection
-import { simpleAuth, simpleShots, getUserCount } from './simple-auth.js';
+import { simpleAuth, simpleShots, getUserCount } from './simple-auth.js?v=7.0';
 import { supabase } from './supabase-client.js';
 import { t, setLanguage, getCurrentLanguage, updateUILanguage, speak, getSpeechCommand } from './i18n.js';
 import { pwaUtils } from './pwa-utils.js';
