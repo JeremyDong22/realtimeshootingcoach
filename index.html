@@ -692,7 +692,7 @@
     
     <!-- App Scripts -->
     <!-- Camera Helper (removed - file not found) -->
-    <script type="module" src="assets/js/app-navigation.js?v=7.0" defer></script>
+    <script type="module" src="assets/js/app-navigation.js?v=7.1" defer></script>
     <script type="module" src="assets/js/i18n.js" defer></script>
     <script src="assets/js/batch-selection.js" defer></script>
     <link rel="stylesheet" href="assets/css/pwa-installer.css">
@@ -701,47 +701,24 @@
     <!-- Service Worker Registration -->
     <script>
         if ('serviceWorker' in navigator) {
-            window.addEventListener('load', async () => {
-                // First, unregister all old service workers
-                const registrations = await navigator.serviceWorker.getRegistrations();
-                for(let registration of registrations) {
-                    console.log('Unregistering old service worker:', registration.scope);
-                    await registration.unregister();
-                }
-                
-                // Clear all caches
-                if ('caches' in window) {
-                    const cacheNames = await caches.keys();
-                    await Promise.all(
-                        cacheNames.map(cacheName => {
-                            console.log('Deleting cache:', cacheName);
-                            return caches.delete(cacheName);
-                        })
-                    );
-                }
-                
-                // Now register the new service worker with timestamp
-                const timestamp = Date.now();
-                navigator.serviceWorker.register(`/service-worker.js?t=${timestamp}`)
+            window.addEventListener('load', () => {
+                // Simple registration with version parameter
+                navigator.serviceWorker.register('/service-worker.js?v=7.1')
                     .then(registration => {
-                        console.log('ServiceWorker v7 registration successful:', registration.scope);
-                        // Force immediate update
-                        registration.update();
+                        console.log('ServiceWorker registration successful:', registration.scope);
                         
-                        // If there's a waiting worker, skip waiting
+                        // Check for updates periodically (every hour)
+                        setInterval(() => {
+                            registration.update();
+                        }, 3600000);
+                        
+                        // If there's a waiting worker, inform user
                         if (registration.waiting) {
-                            registration.waiting.postMessage({ type: 'SKIP_WAITING' });
+                            console.log('New service worker available. Refresh to update.');
                         }
                         
-                        // Listen for updates
                         registration.addEventListener('updatefound', () => {
-                            const newWorker = registration.installing;
-                            newWorker.addEventListener('statechange', () => {
-                                if (newWorker.state === 'activated') {
-                                    console.log('New service worker activated, reloading page...');
-                                    window.location.reload();
-                                }
-                            });
+                            console.log('Service worker update found');
                         });
                     })
                     .catch(err => console.log('ServiceWorker registration failed:', err));
