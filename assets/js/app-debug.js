@@ -56,6 +56,23 @@ let shotCooldown = 0;
 // Shot analysis data
 let shotAnalysisData = null;
 
+// Stability experiment data
+let experimentSession = {
+    isActive: false,
+    startTime: null,
+    shots: [],
+    currentShotIndex: 0
+};
+
+// Store foot positions for stability tracking
+let footTrackingData = {
+    rightHeel: [],
+    rightToe: [],
+    rightHip: null,
+    rightKnee: null,
+    thighLength: 0
+};
+
 // Video recording
 let mediaRecorder = null;
 let recordedChunks = [];
@@ -182,6 +199,146 @@ pose.setOptions({
 
 pose.onResults(onResults);
 
+// Stability experiment functions
+function startExperiment() {
+    experimentSession = {
+        isActive: true,
+        startTime: Date.now(),
+        shots: [],
+        currentShotIndex: 0
+    };
+    
+    const category = getShotCategory(1);
+    document.getElementById('shotCounter').textContent = '0/10';
+    document.getElementById('shotInstruction').textContent = `Shot 1: Please shoot ${category} (${getCategoryInstructions(category)})`;
+    document.getElementById('lastShotData').style.display = 'none';
+    
+    console.log('Experiment started! Collecting 10 shots for stability analysis.');
+}
+
+function stopExperiment() {
+    experimentSession.isActive = false;
+    document.getElementById('shotInstruction').textContent = 'Experiment stopped.';
+    console.log('Experiment stopped.');
+}
+
+function getShotCategory(shotNumber) {
+    if (shotNumber <= 3) return 'UNSTABLE';
+    if (shotNumber <= 6) return 'MODERATE';
+    if (shotNumber <= 10) return 'STABLE';
+    return 'COMPLETE';
+}
+
+function getCategoryInstructions(category) {
+    switch(category) {
+        case 'UNSTABLE': return '不稳定 - Jump forward/sideways';
+        case 'MODERATE': return '一般 - Slight movement';
+        case 'STABLE': return '稳定 - Stay in place';
+        default: return '';
+    }
+}
+
+function calculateFootRotation(heelStart, toeStart, heelEnd, toeEnd) {
+    // Calculate initial foot vector (heel to toe)
+    const startVector = {
+        x: toeStart.x - heelStart.x,
+        y: toeStart.y - heelStart.y
+    };
+    
+    // Calculate final foot vector
+    const endVector = {
+        x: toeEnd.x - heelEnd.x,
+        y: toeEnd.y - heelEnd.y
+    };
+    
+    // Calculate angles
+    const startAngle = Math.atan2(startVector.y, startVector.x);
+    const endAngle = Math.atan2(endVector.y, endVector.x);
+    
+    // Calculate rotation in degrees
+    let rotation = (endAngle - startAngle) * 180 / Math.PI;
+    
+    // Normalize to -180 to 180 range
+    if (rotation > 180) rotation -= 360;
+    if (rotation < -180) rotation += 360;
+    
+    return rotation;
+}
+
+function collectStabilityData() {
+    if (!shotAnalysisData || footTrackingData.rightHeel.length < 2) {
+        console.log('Not enough data to collect stability metrics');
+        return null;
+    }
+    
+    // Find foot positions at shot start and end
+    const startTime = shotAnalysisData.startTime;
+    const endTime = shotAnalysisData.releaseTime;
+    
+    // Get heel positions
+    const heelStart = footTrackingData.rightHeel.find(p => p.time >= startTime);
+    const heelEnd = [...footTrackingData.rightHeel].reverse().find(p => p.time <= endTime);
+    
+    // Get toe positions
+    const toeStart = footTrackingData.rightToe.find(p => p.time >= startTime);
+    const toeEnd = [...footTrackingData.rightToe].reverse().find(p => p.time <= endTime);
+    
+    if (!heelStart || !heelEnd || !toeStart || !toeEnd) {
+        console.log('Missing foot position data');
+        return null;
+    }
+    
+    // Calculate displacements
+    const heelDisplacementX = heelEnd.x - heelStart.x;
+    const toeDisplacementX = toeEnd.x - toeStart.x;
+    
+    // Calculate foot rotation
+    const footRotation = calculateFootRotation(heelStart, toeStart, heelEnd, toeEnd);
+    
+    // Calculate normalized values
+    const normalizedHeelDisplacement = footTrackingData.thighLength > 0 ? 
+        (Math.abs(heelDisplacementX) / footTrackingData.thighLength) * 100 : 0;
+    const normalizedToeDisplacement = footTrackingData.thighLength > 0 ? 
+        (Math.abs(toeDisplacementX) / footTrackingData.thighLength) * 100 : 0;
+    
+    const stabilityData = {
+        shotNumber: experimentSession.currentShotIndex + 1,
+        category: getShotCategory(experimentSession.currentShotIndex + 1),
+        timestamp: Date.now(),
+        
+        // Raw data
+        rightHeelStart: { x: heelStart.x, y: heelStart.y },
+        rightHeelEnd: { x: heelEnd.x, y: heelEnd.y },
+        rightToeStart: { x: toeStart.x, y: toeStart.y },
+        rightToeEnd: { x: toeEnd.x, y: toeEnd.y },
+        
+        // Measurements
+        thighLength: Math.round(footTrackingData.thighLength),
+        heelDisplacementX: Math.round(heelDisplacementX),
+        toeDisplacementX: Math.round(toeDisplacementX),
+        footRotation: Math.round(footRotation * 10) / 10,
+        
+        // Normalized values
+        normalizedHeelDisplacement: Math.round(normalizedHeelDisplacement * 10) / 10,
+        normalizedToeDisplacement: Math.round(normalizedToeDisplacement * 10) / 10,
+        
+        // Shot timing
+        shotDuration: shotAnalysisData.duration,
+        uShapeFound: shotAnalysisData.uShapeFound
+    };
+    
+    // Display the data
+    document.getElementById('lastShotData').style.display = 'block';
+    document.getElementById('heelDisplacement').textContent = stabilityData.heelDisplacementX;
+    document.getElementById('toeDisplacement').textContent = stabilityData.toeDisplacementX;
+    document.getElementById('footRotation').textContent = stabilityData.footRotation;
+    document.getElementById('thighLength').textContent = stabilityData.thighLength;
+    document.getElementById('normalizedHeel').textContent = stabilityData.normalizedHeelDisplacement;
+    document.getElementById('normalizedToe').textContent = stabilityData.normalizedToeDisplacement;
+    
+    return stabilityData;
+}
+
 
 function updateDebugInfo(state) {
     // Update debug panel
@@ -262,8 +419,8 @@ async function onResults(results) {
             [12, 14], [14, 16], // right arm
             [11, 23], [12, 24], // torso to hips
             [23, 24], // hips
-            [23, 25], [25, 27], // left leg
-            [24, 26], [26, 28], // right leg
+            [23, 25], [25, 27], [27, 29], [29, 31], // left leg with ankle and heel
+            [24, 26], [26, 28], [28, 30], [30, 32], // right leg with ankle, heel and toe
             // Hand connections for index fingers only
             [15, 19], // left wrist to left index
             [16, 20], // right wrist to right index
@@ -302,6 +459,72 @@ async function onResults(results) {
         const leftWrist = results.poseLandmarks[15];
         const leftShoulder = results.poseLandmarks[11];
         
+        // Get lower body landmarks for stability tracking
+        const rightHip = results.poseLandmarks[24];
+        const rightKnee = results.poseLandmarks[26];
+        const rightAnkle = results.poseLandmarks[28];
+        const rightHeel = results.poseLandmarks[30];
+        const rightFootIndex = results.poseLandmarks[32]; // toe
+        
+        // Calculate thigh length (hip to knee distance in pixels)
+        if (rightHip && rightKnee) {
+            const thighLengthX = (rightHip.x - rightKnee.x) * canvasElement.width;
+            const thighLengthY = (rightHip.y - rightKnee.y) * canvasElement.height;
+            footTrackingData.thighLength = Math.sqrt(thighLengthX * thighLengthX + thighLengthY * thighLengthY);
+        }
+        
+        // Track heel and toe positions
+        if (rightHeel) {
+            const heelCanvas = {
+                x: rightHeel.x * canvasElement.width,
+                y: rightHeel.y * canvasElement.height,
+                time: currentTime
+            };
+            footTrackingData.rightHeel.push(heelCanvas);
+            
+            // Keep history limited to 3 seconds
+            if (footTrackingData.rightHeel.length > 90) {
+                footTrackingData.rightHeel.shift();
+            }
+            
+            // Draw heel marker for visualization
+            canvasCtx.save();
+            canvasCtx.fillStyle = '#FF00FF';
+            canvasCtx.beginPath();
+            canvasCtx.arc(heelCanvas.x, heelCanvas.y, 6, 0, 2 * Math.PI);
+            canvasCtx.fill();
+            canvasCtx.fillStyle = 'white';
+            canvasCtx.font = 'bold 10px Arial';
+            canvasCtx.textAlign = 'center';
+            canvasCtx.fillText('H', heelCanvas.x, heelCanvas.y + 3);
+            canvasCtx.restore();
+        }
+        
+        if (rightFootIndex) {
+            const toeCanvas = {
+                x: rightFootIndex.x * canvasElement.width,
+                y: rightFootIndex.y * canvasElement.height,
+                time: currentTime
+            };
+            footTrackingData.rightToe.push(toeCanvas);
+            
+            // Keep history limited to 3 seconds
+            if (footTrackingData.rightToe.length > 90) {
+                footTrackingData.rightToe.shift();
+            }
+            
+            // Draw toe marker for visualization
+            canvasCtx.save();
+            canvasCtx.fillStyle = '#00FFFF';
+            canvasCtx.beginPath();
+            canvasCtx.arc(toeCanvas.x, toeCanvas.y, 6, 0, 2 * Math.PI);
+            canvasCtx.fill();
+            canvasCtx.fillStyle = 'white';
+            canvasCtx.font = 'bold 10px Arial';
+            canvasCtx.textAlign = 'center';
+            canvasCtx.fillText('T', toeCanvas.x, toeCanvas.y + 3);
+            canvasCtx.restore();
+        }
 
         // Update wrist position display (rounded)
         leftWristElement.textContent = '-';
@@ -547,6 +770,33 @@ function triggerShotDetection() {
         alertDiv.style.zIndex = '100';
         
         document.querySelector('.container').appendChild(alertDiv);
+        
+        // Handle experiment data collection
+        if (experimentSession.isActive) {
+            setTimeout(() => {
+                const stabilityData = collectStabilityData();
+                if (stabilityData) {
+                    experimentSession.shots.push(stabilityData);
+                    experimentSession.currentShotIndex++;
+                    
+                    // Update UI
+                    document.getElementById('shotCounter').textContent = `${experimentSession.currentShotIndex}/10`;
+                    
+                    if (experimentSession.currentShotIndex < 10) {
+                        // Prepare for next shot
+                        const nextCategory = getShotCategory(experimentSession.currentShotIndex + 1);
+                        document.getElementById('shotInstruction').textContent = 
+                            `Shot ${experimentSession.currentShotIndex + 1}: Please shoot ${nextCategory} (${getCategoryInstructions(nextCategory)})`;
+                    } else {
+                        // Experiment complete
+                        document.getElementById('shotInstruction').textContent = 'Experiment complete! Generating report...';
+                        setTimeout(() => generateExperimentReport(), 1000);
+                    }
+                    
+                    console.log(`Shot ${experimentSession.currentShotIndex} collected:`, stabilityData);
+                }
+            }, 500); // Wait 500ms to ensure we have complete shot data
+        }
         
         // Send shot detection to parent window if in iframe
         if (window.parent !== window && shotAnalysisData) {
@@ -1175,6 +1425,292 @@ async function clearAllVideos() {
         request.onerror = () => reject(request.error);
     });
 }
+
+// Generate experiment report with charts and analysis
+function generateExperimentReport() {
+    if (experimentSession.shots.length === 0) {
+        console.log('No shots to report');
+        return;
+    }
+    
+    // Group shots by category
+    const unstableShots = experimentSession.shots.filter(s => s.category === 'UNSTABLE');
+    const moderateShots = experimentSession.shots.filter(s => s.category === 'MODERATE');
+    const stableShots = experimentSession.shots.filter(s => s.category === 'STABLE');
+    
+    // Calculate averages
+    const calculateAverage = (shots, field) => {
+        if (shots.length === 0) return 0;
+        return shots.reduce((sum, shot) => sum + Math.abs(shot[field]), 0) / shots.length;
+    };
+    
+    const unstableAvgHeel = calculateAverage(unstableShots, 'normalizedHeelDisplacement');
+    const moderateAvgHeel = calculateAverage(moderateShots, 'normalizedHeelDisplacement');
+    const stableAvgHeel = calculateAverage(stableShots, 'normalizedHeelDisplacement');
+    
+    // Create HTML report
+    const reportHTML = `
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Shooting Stability Report - ${new Date().toLocaleDateString()}</title>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            margin: 20px;
+            background: #f5f5f5;
+        }
+        .header {
+            text-align: center;
+            background: #333;
+            color: white;
+            padding: 20px;
+            border-radius: 10px;
+            margin-bottom: 30px;
+        }
+        .summary {
+            background: white;
+            padding: 20px;
+            border-radius: 10px;
+            margin-bottom: 30px;
+            box-shadow: 0 2px 5px rgba(0,0,0,0.1);
+        }
+        table {
+            width: 100%;
+            border-collapse: collapse;
+            margin: 20px 0;
+        }
+        th, td {
+            border: 1px solid #ddd;
+            padding: 12px;
+            text-align: center;
+        }
+        th {
+            background-color: #333;
+            color: white;
+        }
+        tr:nth-child(even) {
+            background-color: #f2f2f2;
+        }
+        .chart-container {
+            background: white;
+            padding: 20px;
+            border-radius: 10px;
+            margin-bottom: 30px;
+            box-shadow: 0 2px 5px rgba(0,0,0,0.1);
+            height: 400px;
+            position: relative;
+        }
+        .recommendations {
+            background: #e8f5e9;
+            padding: 20px;
+            border-radius: 10px;
+            margin-top: 30px;
+            border-left: 5px solid #4caf50;
+        }
+        .category-unstable { color: #f44336; font-weight: bold; }
+        .category-moderate { color: #ff9800; font-weight: bold; }
+        .category-stable { color: #4caf50; font-weight: bold; }
+    </style>
+</head>
+<body>
+    <div class="header">
+        <h1>📊 Shooting Stability Experiment Report</h1>
+        <p>Date: ${new Date().toLocaleString()}</p>
+        <p>Total Shots: ${experimentSession.shots.length}</p>
+    </div>
+
+    <div class="summary">
+        <h2>📋 Data Summary</h2>
+        <table>
+            <thead>
+                <tr>
+                    <th>Shot #</th>
+                    <th>Category</th>
+                    <th>Heel Disp (px)</th>
+                    <th>Toe Disp (px)</th>
+                    <th>Rotation (°)</th>
+                    <th>Thigh (px)</th>
+                    <th>Heel/Thigh (%)</th>
+                    <th>Toe/Thigh (%)</th>
+                </tr>
+            </thead>
+            <tbody>
+                ${experimentSession.shots.map(shot => `
+                    <tr>
+                        <td>${shot.shotNumber}</td>
+                        <td class="category-${shot.category.toLowerCase()}">${shot.category}</td>
+                        <td>${shot.heelDisplacementX}</td>
+                        <td>${shot.toeDisplacementX}</td>
+                        <td>${shot.footRotation}</td>
+                        <td>${shot.thighLength}</td>
+                        <td>${shot.normalizedHeelDisplacement}</td>
+                        <td>${shot.normalizedToeDisplacement}</td>
+                    </tr>
+                `).join('')}
+            </tbody>
+        </table>
+    </div>
+
+    <div class="chart-container">
+        <h2>📈 Displacement Trend (X-axis)</h2>
+        <canvas id="trendChart"></canvas>
+    </div>
+
+    <div class="chart-container">
+        <h2>📊 Category Comparison</h2>
+        <canvas id="comparisonChart"></canvas>
+    </div>
+
+    <div class="recommendations">
+        <h2>🎯 Stability Analysis & Recommendations</h2>
+        <p><strong>Average Normalized Heel Displacement:</strong></p>
+        <ul>
+            <li><span class="category-unstable">Unstable Shots (1-3):</span> ${unstableAvgHeel.toFixed(1)}%</li>
+            <li><span class="category-moderate">Moderate Shots (4-6):</span> ${moderateAvgHeel.toFixed(1)}%</li>
+            <li><span class="category-stable">Stable Shots (7-10):</span> ${stableAvgHeel.toFixed(1)}%</li>
+        </ul>
+        
+        <h3>Suggested Stability Thresholds:</h3>
+        <ul>
+            <li>🏆 <strong>Excellent:</strong> < ${stableAvgHeel.toFixed(1)}% heel displacement</li>
+            <li>✅ <strong>Good:</strong> ${stableAvgHeel.toFixed(1)}% - ${moderateAvgHeel.toFixed(1)}% heel displacement</li>
+            <li>⚠️ <strong>Needs Improvement:</strong> > ${moderateAvgHeel.toFixed(1)}% heel displacement</li>
+        </ul>
+        
+        <h3>Raw Data Export (JSON):</h3>
+        <pre style="background: #f5f5f5; padding: 10px; border-radius: 5px; overflow-x: auto;">
+${JSON.stringify(experimentSession.shots, null, 2)}
+        </pre>
+    </div>
+
+    <script>
+        // Trend Chart
+        const trendCtx = document.getElementById('trendChart').getContext('2d');
+        new Chart(trendCtx, {
+            type: 'line',
+            data: {
+                labels: ${JSON.stringify(experimentSession.shots.map(s => 'Shot ' + s.shotNumber))},
+                datasets: [{
+                    label: 'Heel Displacement (px)',
+                    data: ${JSON.stringify(experimentSession.shots.map(s => s.heelDisplacementX))},
+                    borderColor: 'rgb(255, 99, 132)',
+                    backgroundColor: 'rgba(255, 99, 132, 0.2)',
+                    tension: 0.1
+                }, {
+                    label: 'Toe Displacement (px)',
+                    data: ${JSON.stringify(experimentSession.shots.map(s => s.toeDisplacementX))},
+                    borderColor: 'rgb(54, 162, 235)',
+                    backgroundColor: 'rgba(54, 162, 235, 0.2)',
+                    tension: 0.1
+                }]
+            },
+            options: {
+                responsive: true,
+                maintainAspectRatio: false,
+                plugins: {
+                    title: {
+                        display: true,
+                        text: 'Foot Displacement Across 10 Shots'
+                    }
+                },
+                scales: {
+                    y: {
+                        beginAtZero: true,
+                        title: {
+                            display: true,
+                            text: 'Displacement (pixels)'
+                        }
+                    }
+                }
+            }
+        });
+
+        // Comparison Chart
+        const compCtx = document.getElementById('comparisonChart').getContext('2d');
+        new Chart(compCtx, {
+            type: 'bar',
+            data: {
+                labels: ['Unstable', 'Moderate', 'Stable'],
+                datasets: [{
+                    label: 'Avg Heel/Thigh (%)',
+                    data: [${unstableAvgHeel.toFixed(1)}, ${moderateAvgHeel.toFixed(1)}, ${stableAvgHeel.toFixed(1)}],
+                    backgroundColor: ['rgba(244, 67, 54, 0.6)', 'rgba(255, 152, 0, 0.6)', 'rgba(76, 175, 80, 0.6)'],
+                    borderColor: ['rgb(244, 67, 54)', 'rgb(255, 152, 0)', 'rgb(76, 175, 80)'],
+                    borderWidth: 2
+                }]
+            },
+            options: {
+                responsive: true,
+                maintainAspectRatio: false,
+                plugins: {
+                    title: {
+                        display: true,
+                        text: 'Average Normalized Displacement by Category'
+                    }
+                },
+                scales: {
+                    y: {
+                        beginAtZero: true,
+                        title: {
+                            display: true,
+                            text: 'Heel Displacement / Thigh Length (%)'
+                        }
+                    }
+                }
+            }
+        });
+    </script>
+</body>
+</html>`;
+
+    // Create blob and download
+    const blob = new Blob([reportHTML], { type: 'text/html' });
+    const url = URL.createObjectURL(blob);
+    
+    // Auto-download report
+    const downloadLink = document.createElement('a');
+    downloadLink.href = url;
+    downloadLink.download = `stability_report_${new Date().toISOString().slice(0,10)}.html`;
+    downloadLink.click();
+    
+    // Open in new tab for preview
+    window.open(url, '_blank');
+    
+    // Reset experiment
+    experimentSession.isActive = false;
+    document.getElementById('shotInstruction').textContent = 'Report generated and downloaded! You can start a new experiment.';
+    
+    console.log('Experiment Report Generated');
+    console.log('Unstable avg:', unstableAvgHeel.toFixed(1) + '%');
+    console.log('Moderate avg:', moderateAvgHeel.toFixed(1) + '%');
+    console.log('Stable avg:', stableAvgHeel.toFixed(1) + '%');
+}
+
+// Add event listeners for experiment buttons
+document.addEventListener('DOMContentLoaded', () => {
+    const startExpBtn = document.getElementById('startExperiment');
+    const stopExpBtn = document.getElementById('stopExperiment');
+    
+    if (startExpBtn) {
+        startExpBtn.addEventListener('click', () => {
+            startExperiment();
+            startExpBtn.style.display = 'none';
+            stopExpBtn.style.display = 'block';
+        });
+    }
+    
+    if (stopExpBtn) {
+        stopExpBtn.addEventListener('click', () => {
+            stopExperiment();
+            stopExpBtn.style.display = 'none';
+            startExpBtn.style.display = 'block';
+        });
+    }
+});
 
 // Export functions for parent window
 window.videoStorage = {

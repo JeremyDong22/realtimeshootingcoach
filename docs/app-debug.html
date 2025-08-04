@@ -90,6 +90,25 @@
             <p>Shot Duration: <span id="shotDuration">-</span></p>
         </div>
         
+        <div class="experiment-panel" style="background-color: #2a4a2a; padding: 15px; border-radius: 5px; margin-top: 20px;">
+            <h3>📊 Stability Experiment (稳定性实验)</h3>
+            <button id="startExperiment" style="background-color: #00aa00;">Start 10-Shot Experiment</button>
+            <button id="stopExperiment" style="display: none; background-color: #aa0000;">Stop Experiment</button>
+            <div id="experimentStatus" style="margin-top: 15px;">
+                <h4>Progress: <span id="shotCounter">0/10</span></h4>
+                <p id="shotInstruction" style="font-size: 18px; color: #ffff00;">Click "Start 10-Shot Experiment" to begin</p>
+                <div id="lastShotData" style="display: none; margin-top: 10px; padding: 10px; background-color: #1a1a1a; border-radius: 5px;">
+                    <h5>Last Shot Data:</h5>
+                    <p>Heel X Displacement: <span id="heelDisplacement">-</span> px</p>
+                    <p>Toe X Displacement: <span id="toeDisplacement">-</span> px</p>
+                    <p>Foot Rotation: <span id="footRotation">-</span>°</p>
+                    <p>Thigh Length: <span id="thighLength">-</span> px</p>
+                    <p>Normalized Heel: <span id="normalizedHeel">-</span>%</p>
+                    <p>Normalized Toe: <span id="normalizedToe">-</span>%</p>
+                </div>
+            </div>
+        </div>
+        
         <div class="instructions">
             <h3>Instructions:</h3>
             <ol>
@@ -109,6 +128,6 @@
     <script src="https://cdn.jsdelivr.net/npm/@mediapipe/pose/pose.js"></script>
     
     <!-- App script -->
-    <script src="app-debug.js"></script>
+    <script src="../assets/js/app-debug.js"></script>
 </body>
 </html>

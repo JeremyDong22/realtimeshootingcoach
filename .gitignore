@@ -36,3 +36,6 @@ build/
 # Misc
 *.zip
 .vercel
+
+# experiment files
+experiment/

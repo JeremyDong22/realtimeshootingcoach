@@ -573,7 +573,10 @@ h4 { font-size: var(--font-lg); }
     overflow-y: auto;
     -webkit-overflow-scrolling: touch;
     padding-top: var(--space-lg);
-    padding-bottom: calc(var(--navbar-height) + env(safe-area-inset-bottom, 0) + var(--space-xl));
+    /* Increase bottom padding to prevent content from going under navbar */
+    padding-bottom: calc(var(--navbar-height) + env(safe-area-inset-bottom, 0) + var(--space-xl) + 40px);
+    /* Add scroll padding to keep content visible above navbar */
+    scroll-padding-bottom: calc(var(--navbar-height) + 40px);
 }
 
 /* Hero Container - Responsive Height */
@@ -641,10 +644,10 @@ h4 { font-size: var(--font-lg); }
 /* Stats Hero Section */
 .stats-hero {
     padding: var(--space-xl) var(--space-lg);
-    margin: 0 var(--space-lg) var(--space-lg) var(--space-lg); /* Add horizontal margins to match grid */
+    margin: 0 var(--space-lg) var(--space-lg) var(--space-lg); /* Keep consistent horizontal margins */
     background: linear-gradient(135deg, var(--bg-secondary) 0%, var(--bg-tertiary) 100%);
     text-align: center;
-    border-radius: var(--radius-xl); /* Add rounded corners to match other cards */
+    border-radius: var(--radius-xl);
     border: 1px solid var(--bg-tertiary);
     box-shadow: var(--shadow-sm);
 }
@@ -769,7 +772,8 @@ h4 { font-size: var(--font-lg); }
 /* Recent Shots - Modern Horizontal Grid */
 .recent-section {
     padding: var(--space-lg) 0;
-    margin-bottom: var(--space-xl);
+    /* Add extra bottom margin to prevent overlapping with navbar */
+    margin-bottom: calc(var(--navbar-height) + var(--space-xl) + 20px);
     position: relative;
     z-index: 1;
 }
@@ -816,7 +820,10 @@ h4 { font-size: var(--font-lg); }
     scroll-snap-type: x mandatory;
     -webkit-overflow-scrolling: touch;
     scrollbar-width: none;
+    /* Match padding with stats-grid for consistency */
     padding: 0 var(--space-lg) var(--space-md);
+    /* Prevent vertical overflow that could cover navbar */
+    max-height: 200px;
 }
 
 .recent-shots::-webkit-scrollbar {
@@ -826,6 +833,7 @@ h4 { font-size: var(--font-lg); }
 /* Recent Shot Cards - Square Design */
 .recent-shots .replay-card {
     flex: 0 0 140px;
+    height: 140px; /* Fixed height to prevent overflow */
     background: var(--bg-card);
     border: 2px solid var(--bg-tertiary);
     border-radius: var(--radius-xl);
