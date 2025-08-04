@@ -519,6 +519,17 @@ h4 { font-size: var(--font-lg); }
 }
 
 .btn-primary:active {
+    opacity: 0.95;
+    transform: translateY(0);
+    box-shadow: var(--shadow-sm);
+}
+
+.btn-primary.loading {
+    opacity: 0.8;
+    pointer-events: none;
+}
+
+.btn-primary:disabled:active {
     transform: translateY(0);
 }
 
@@ -669,6 +680,8 @@ h4 { font-size: var(--font-lg); }
     padding: 0 var(--space-lg);
     margin-bottom: var(--space-lg);
     height: var(--stat-grid-height);
+    position: relative;
+    z-index: 0;
 }
 
 .stat-card {
@@ -757,6 +770,8 @@ h4 { font-size: var(--font-lg); }
 .recent-section {
     padding: var(--space-lg) 0;
     margin-bottom: var(--space-xl);
+    position: relative;
+    z-index: 1;
 }
 
 .section-header {
@@ -765,6 +780,8 @@ h4 { font-size: var(--font-lg); }
     justify-content: space-between;
     margin-bottom: var(--space-lg);
     padding: 0 var(--space-lg);
+    position: relative;
+    z-index: 2;
 }
 
 .section-title {

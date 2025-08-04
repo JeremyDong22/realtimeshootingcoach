@@ -30,6 +30,10 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 - **Automatic Deployment**:
   - If we push our code to Github, it will automatically deploy to Vercel.  
+- **Vercel Deployment Considerations**:
+  - Always keep in mind that we are deploying to Vercel, not GitHub Pages
+  - Look at the Vercel official documentation for potential deployment issues
+  - Once we push changes to GitHub, commit the change, and Vercel will automatically deploy
 
 ## Key Commands
 

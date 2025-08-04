@@ -774,6 +774,13 @@ function navigateTo(page) {
         } else if (page === 'home') {
             loadStats();
             loadRecentShots();
+        } else if (page === 'trainingSetup') {
+            // Reset training button state when returning to training setup
+            isStartingTraining = false;
+            const btn = document.querySelector('.start-training-btn');
+            if (btn && btn.disabled && state.trainingSettings.mode) {
+                btn.disabled = false;
+            }
         }
     }
 }
@@ -2524,34 +2531,58 @@ function selectTrainingMode(mode) {
 }
 
 
+// Add debounce flag to prevent double-clicks
+let isStartingTraining = false;
+
 function startTrainingWithSettings() {
-    // Get values from inputs
-    if (state.trainingSettings.mode === 'shots') {
-        state.trainingSettings.targetShots = parseInt(document.getElementById('targetShots').value);
-    } else if (state.trainingSettings.mode === 'time') {
-        state.trainingSettings.targetTime = parseInt(document.getElementById('targetTime').value);
-        state.trainingSettings.timeRemaining = state.trainingSettings.targetTime;
+    // Prevent double-clicks
+    if (isStartingTraining) return;
+    
+    const btn = document.querySelector('.start-training-btn');
+    
+    // Disable button immediately to prevent double-clicks
+    if (btn) {
+        btn.disabled = true;
+        isStartingTraining = true;
     }
     
-    // Navigate to instructions page first
-    navigateTo('trainingInstructions');
-    
-    // Update mode reminder
-    const modeText = state.trainingSettings.mode === 'shots' ? 'Shot Count' : 
-                     state.trainingSettings.mode === 'time' ? 'Time Trial' : 'Free Practice';
-    document.getElementById('modeReminder').textContent = modeText;
-    
-    // Update target reminder
-    const targetEl = document.getElementById('targetReminder');
-    if (state.trainingSettings.mode === 'shots') {
-        targetEl.textContent = `Target: ${state.trainingSettings.targetShots} shots`;
-    } else if (state.trainingSettings.mode === 'time') {
-        const minutes = Math.floor(state.trainingSettings.targetTime / 60);
-        const seconds = state.trainingSettings.targetTime % 60;
-        targetEl.textContent = `Duration: ${minutes}:${seconds.toString().padStart(2, '0')}`;
-    } else {
-        targetEl.textContent = 'No limits - practice freely';
-    }
+    // Use requestAnimationFrame to ensure smooth transition
+    requestAnimationFrame(() => {
+        // Get values from inputs
+        if (state.trainingSettings.mode === 'shots') {
+            state.trainingSettings.targetShots = parseInt(document.getElementById('targetShots').value);
+        } else if (state.trainingSettings.mode === 'time') {
+            state.trainingSettings.targetTime = parseInt(document.getElementById('targetTime').value);
+            state.trainingSettings.timeRemaining = state.trainingSettings.targetTime;
+        }
+        
+        // Update mode reminder
+        const modeText = state.trainingSettings.mode === 'shots' ? 'Shot Count' : 
+                         state.trainingSettings.mode === 'time' ? 'Time Trial' : 'Free Practice';
+        document.getElementById('modeReminder').textContent = modeText;
+        
+        // Update target reminder
+        const targetEl = document.getElementById('targetReminder');
+        if (state.trainingSettings.mode === 'shots') {
+            targetEl.textContent = `Target: ${state.trainingSettings.targetShots} shots`;
+        } else if (state.trainingSettings.mode === 'time') {
+            const minutes = Math.floor(state.trainingSettings.targetTime / 60);
+            const seconds = state.trainingSettings.targetTime % 60;
+            targetEl.textContent = `Duration: ${minutes}:${seconds.toString().padStart(2, '0')}`;
+        } else {
+            targetEl.textContent = 'No limits - practice freely';
+        }
+        
+        // Navigate to instructions page after updating content
+        setTimeout(() => {
+            navigateTo('trainingInstructions');
+            // Re-enable button after navigation
+            if (btn) {
+                btn.disabled = false;
+            }
+            isStartingTraining = false;
+        }, 50); // Small delay to ensure smooth transition
+    });
 }
 
 
