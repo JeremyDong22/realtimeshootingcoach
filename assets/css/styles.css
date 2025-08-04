@@ -565,6 +565,9 @@ h4 { font-size: var(--font-lg); }
     background: var(--bg-primary);
     display: flex;
     flex-direction: column;
+    /* Ensure content doesn't overflow under navbar */
+    height: calc(100vh - var(--navbar-height));
+    overflow: hidden;
 }
 
 /* Home page scrollable content */
@@ -573,10 +576,10 @@ h4 { font-size: var(--font-lg); }
     overflow-y: auto;
     -webkit-overflow-scrolling: touch;
     padding-top: var(--space-lg);
-    /* Increase bottom padding to prevent content from going under navbar */
-    padding-bottom: calc(var(--navbar-height) + env(safe-area-inset-bottom, 0) + var(--space-xl) + 40px);
-    /* Add scroll padding to keep content visible above navbar */
-    scroll-padding-bottom: calc(var(--navbar-height) + 40px);
+    /* Ensure enough bottom padding to keep content above navbar */
+    padding-bottom: calc(var(--navbar-height) + env(safe-area-inset-bottom, 0) + 100px);
+    /* Prevent scrolling content under navbar */
+    margin-bottom: 0;
 }
 
 /* Hero Container - Responsive Height */
@@ -771,11 +774,13 @@ h4 { font-size: var(--font-lg); }
 
 /* Recent Shots - Modern Horizontal Grid */
 .recent-section {
-    padding: var(--space-lg) 0;
-    /* Add extra bottom margin to prevent overlapping with navbar */
-    margin-bottom: calc(var(--navbar-height) + var(--space-xl) + 20px);
+    padding: var(--space-lg) 0 0 0;
+    /* Remove bottom margin as it's handled by container */
+    margin-bottom: 0;
     position: relative;
     z-index: 1;
+    /* Ensure section doesn't overflow */
+    overflow: hidden;
 }
 
 .section-header {
@@ -817,13 +822,16 @@ h4 { font-size: var(--font-lg); }
     display: flex;
     gap: var(--space-lg);
     overflow-x: auto;
+    overflow-y: hidden;
     scroll-snap-type: x mandatory;
     -webkit-overflow-scrolling: touch;
     scrollbar-width: none;
     /* Match padding with stats-grid for consistency */
-    padding: 0 var(--space-lg) var(--space-md);
-    /* Prevent vertical overflow that could cover navbar */
-    max-height: 200px;
+    padding: 0 var(--space-lg);
+    /* Add bottom padding to prevent overlap with navbar */
+    padding-bottom: calc(var(--navbar-height) + var(--space-lg));
+    /* Fixed height container */
+    height: 180px;
 }
 
 .recent-shots::-webkit-scrollbar {
@@ -834,6 +842,7 @@ h4 { font-size: var(--font-lg); }
 .recent-shots .replay-card {
     flex: 0 0 140px;
     height: 140px; /* Fixed height to prevent overflow */
+    max-height: 140px;
     background: var(--bg-card);
     border: 2px solid var(--bg-tertiary);
     border-radius: var(--radius-xl);
@@ -2212,7 +2221,8 @@ h4 { font-size: var(--font-lg); }
     display: flex;
     justify-content: space-around;
     align-items: center;
-    z-index: var(--z-navbar);
+    /* Ensure navbar is always on top */
+    z-index: 1000;
     backdrop-filter: blur(20px);
 }
 

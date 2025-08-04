@@ -1593,18 +1593,22 @@ const PROCESS_INTERVAL = 33; // Process every 33ms (30 FPS) for smooth tracking
 
 let poseResultCount = 0;
 function onPoseResults(results) {
+    // Add safety checks before processing
+    const canvas = document.getElementById('canvas');
+    const video = document.getElementById('video');
+    
+    if (!canvas || !video) {
+        return; // Exit early if elements don't exist
+    }
+    
+    const ctx = canvas.getContext('2d');
+    if (!ctx) {
+        return; // Exit early if context fails
+    }
+    
     try {
-        
-        // Throttle processing to improve performance
-        const now = Date.now();
-        if (now - lastProcessTime < PROCESS_INTERVAL) {
-            return;
-        }
-        lastProcessTime = now;
-        
-        const canvas = document.getElementById('canvas');
-        const ctx = canvas.getContext('2d');
-        const video = document.getElementById('video');
+        // Remove throttling for real-time performance
+        // Every frame is now processed for smoother tracking
         
         // Set canvas size only once
         if (!state.canvasSizeSet && video.videoWidth) {
@@ -1708,7 +1712,8 @@ function onPoseResults(results) {
         }
         // Remove body detection after countdown - focusing only on shot detection
         
-        // Check if countdown is in progress - simplified for performance
+        // Skip all DOM operations after countdown for better performance
+        // Only check joints during countdown phase
         if (!state.shotDetection.isCountdownComplete && state.isTraining) {
             // Check all joints individually
             const jointChecks = {
