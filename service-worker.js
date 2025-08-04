@@ -27,14 +27,14 @@ const NO_CACHE_PATTERNS = [
 
 // Install event - cache resources
 self.addEventListener('install', event => {
-  console.log('Service Worker v5.0 installing...');
+  console.log('Service Worker v7.0 installing...');
   // Skip waiting to activate immediately
   self.skipWaiting();
   
   event.waitUntil(
     caches.open(CACHE_NAME)
       .then(cache => {
-        console.log('Opened cache v5.0');
+        console.log('Opened cache v7.0');
         return cache.addAll(urlsToCache);
       })
   );
@@ -71,7 +71,7 @@ self.addEventListener('fetch', event => {
 
 // Activate event - clean up old caches
 self.addEventListener('activate', event => {
-  console.log('Service Worker v5.0 activating...');
+  console.log('Service Worker v7.0 activating...');
   const cacheWhitelist = [CACHE_NAME];
   
   event.waitUntil(

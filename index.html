@@ -702,8 +702,13 @@
     <script>
         if ('serviceWorker' in navigator) {
             window.addEventListener('load', () => {
-                navigator.serviceWorker.register('/service-worker.js')
-                    .then(registration => console.log('ServiceWorker registration successful:', registration.scope))
+                // Add timestamp to force service worker update
+                navigator.serviceWorker.register('/service-worker.js?v=7.0')
+                    .then(registration => {
+                        console.log('ServiceWorker registration successful:', registration.scope);
+                        // Force update check
+                        registration.update();
+                    })
                     .catch(err => console.log('ServiceWorker registration failed:', err));
             });
         }
