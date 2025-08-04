@@ -2544,6 +2544,13 @@ h4 { font-size: var(--font-lg); }
         padding: env(safe-area-inset-top, 20px) var(--space-md) env(safe-area-inset-bottom, 20px) var(--space-md);
     }
     
+    /* Ensure consistent padding for all main containers */
+    .stats-grid,
+    .section-header {
+        padding-left: var(--space-md);
+        padding-right: var(--space-md);
+    }
+    
     .logo-circle {
         width: 80px;
         height: 80px;
@@ -2578,10 +2585,14 @@ h4 { font-size: var(--font-lg); }
     
     .recent-shots {
         gap: var(--space-sm);
+        /* Maintain horizontal padding on small screens */
+        padding-left: var(--space-md);
+        padding-right: var(--space-md);
     }
     
     .recent-shots .replay-card {
         flex: 0 0 120px;
+        height: 120px;
     }
     
     .modal {
@@ -2631,6 +2642,7 @@ h4 { font-size: var(--font-lg); }
     
     .recent-shots .replay-card {
         flex: 0 0 160px;
+        height: 160px;
     }
     
     .modal-content {
@@ -2653,6 +2665,12 @@ h4 { font-size: var(--font-lg); }
     /* Landing Page Mobile Adjustments for larger phones */
     #landing {
         padding: env(safe-area-inset-top, 20px) var(--space-md) env(safe-area-inset-bottom, 20px) var(--space-md);
+    }
+    
+    /* Ensure consistent padding on mobile */
+    .recent-shots {
+        padding-left: var(--space-sm);
+        padding-right: var(--space-sm);
     }
     
     .logo-container {
