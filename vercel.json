@@ -16,8 +16,33 @@
           "value": "no-cache, no-store, must-revalidate"
         },
         {
+          "key": "CDN-Cache-Control",
+          "value": "no-cache, no-store"
+        },
+        {
+          "key": "Vercel-CDN-Cache-Control",
+          "value": "no-cache, no-store"
+        },
+        {
           "key": "Service-Worker-Allowed",
           "value": "/"
+        }
+      ]
+    },
+    {
+      "source": "/assets/js/(.*)",
+      "headers": [
+        {
+          "key": "Cache-Control",
+          "value": "no-cache, no-store, must-revalidate"
+        },
+        {
+          "key": "CDN-Cache-Control",
+          "value": "no-cache, no-store"
+        },
+        {
+          "key": "Vercel-CDN-Cache-Control",
+          "value": "no-cache, no-store"
         }
       ]
     },
