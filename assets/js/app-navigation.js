@@ -1589,7 +1589,7 @@ function startDebugPanel() {
 // Pose Results Handler
 let poseFrameCount = 0;
 let lastProcessTime = 0;
-const PROCESS_INTERVAL = 50; // Process every 50ms (20 FPS) for better performance
+const PROCESS_INTERVAL = 33; // Process every 33ms (30 FPS) for smooth tracking
 
 let poseResultCount = 0;
 function onPoseResults(results) {
@@ -1603,7 +1603,7 @@ function onPoseResults(results) {
         lastProcessTime = now;
         
         const canvas = document.getElementById('canvas');
-        const ctx = canvas.getContext('2d', { willReadFrequently: true });
+        const ctx = canvas.getContext('2d');
         const video = document.getElementById('video');
         
         // Set canvas size only once
@@ -1627,23 +1627,83 @@ function onPoseResults(results) {
     }
     
     if (results.poseLandmarks) {
-        // Always draw wrist for smooth visual tracking
         const isLeftHanded = state.shootingHand === 'left';
-        const wristIndex = isLeftHanded ? 15 : 16;  // Left wrist: 15, Right wrist: 16
         
+        // Draw skeleton connections for shooting side
+        // Define connections based on shooting hand
+        const shootingSideConnections = isLeftHanded ? [
+            // Left side connections
+            [11, 13], // left shoulder to left elbow
+            [13, 15], // left elbow to left wrist
+            [15, 17], // left wrist to left pinky
+            [15, 19], // left wrist to left index
+            [15, 21], // left wrist to left thumb
+            [11, 23], // left shoulder to left hip
+            [23, 25], // left hip to left knee
+            [25, 27], // left knee to left ankle
+            [27, 29], // left ankle to left heel
+            [27, 31], // left ankle to left foot index
+            [29, 31], // left heel to left foot index
+        ] : [
+            // Right side connections
+            [12, 14], // right shoulder to right elbow
+            [14, 16], // right elbow to right wrist
+            [16, 18], // right wrist to right pinky
+            [16, 20], // right wrist to right index
+            [16, 22], // right wrist to right thumb
+            [12, 24], // right shoulder to right hip
+            [24, 26], // right hip to right knee
+            [26, 28], // right knee to right ankle
+            [28, 30], // right ankle to right heel
+            [28, 32], // right ankle to right foot index
+            [30, 32], // right heel to right foot index
+        ];
+        
+        // Add torso connections
+        const torsoConnections = [
+            [11, 12], // shoulders
+            [23, 24], // hips
+            [11, 23], // left shoulder to left hip
+            [12, 24], // right shoulder to right hip
+        ];
+        
+        // Draw all connections with black lines
+        const allConnections = [...shootingSideConnections, ...torsoConnections];
+        drawConnectors(ctx, results.poseLandmarks, allConnections, {
+            color: '#000000', // Black lines
+            lineWidth: 2
+        });
+        
+        // Draw joints as small white circles (except wrist)
+        const shootingSideJoints = isLeftHanded ? 
+            [11, 13, 17, 19, 21, 23, 25, 27, 29, 31] : // Left side joints (excluding wrist 15)
+            [12, 14, 18, 20, 22, 24, 26, 28, 30, 32];  // Right side joints (excluding wrist 16)
+        
+        // Add torso joints
+        const torsoJoints = isLeftHanded ? [12, 24] : [11, 23]; // Opposite side shoulder and hip
+        const allJoints = [...shootingSideJoints, ...torsoJoints];
+        
+        // Draw white joint circles
+        allJoints.forEach(jointIndex => {
+            if (results.poseLandmarks[jointIndex]) {
+                drawLandmarks(ctx, [results.poseLandmarks[jointIndex]], {
+                    color: '#FFFFFF', // White
+                    fillColor: '#FFFFFF',
+                    lineWidth: 1,
+                    radius: 3 // Small circles
+                });
+            }
+        });
+        
+        // Draw wrist point in orange (special highlight)
+        const wristIndex = isLeftHanded ? 15 : 16;
         if (results.poseLandmarks[wristIndex]) {
             const wrist = results.poseLandmarks[wristIndex];
-            const x = wrist.x * canvas.width;
-            const y = wrist.y * canvas.height;
-            
-            // Simplified - no trail, just the wrist point
-            
-            // Draw wrist point in orange
             drawLandmarks(ctx, [wrist], {
                 color: '#FF6B35', // Orange
                 fillColor: '#FF6B35',
                 lineWidth: 2,
-                radius: 8 // Larger
+                radius: 8 // Larger for wrist
             });
         }
         // Remove body detection after countdown - focusing only on shot detection
@@ -2153,7 +2213,7 @@ async function generateVideoFromFrames(startTime, endTime) {
     // Set up MediaRecorder
     const stream = videoCanvas.captureStream(30);
     const recorder = new MediaRecorder(stream, {
-        mimeType: 'video/webm;codecs=vp9'
+        mimeType: 'video/webm;codecs=vp8'
     });
     
     return new Promise((resolve, reject) => {
