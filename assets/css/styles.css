@@ -177,6 +177,16 @@ h4 { font-size: var(--font-lg); }
     overflow: hidden;
 }
 
+/* Profile page scrollable */
+#profile {
+    overflow-y: auto;
+    overflow-x: hidden;
+}
+
+#profile.active {
+    display: flex !important;
+}
+
 .page.active {
     display: flex !important;
 }
@@ -1893,11 +1903,19 @@ h4 { font-size: var(--font-lg); }
 }
 
 /* Profile Page */
+.profile-wrapper {
+    flex: 1;
+    overflow-y: auto;
+    overflow-x: hidden;
+    -webkit-overflow-scrolling: touch;
+}
+
 .profile-header {
     padding: var(--space-xl) var(--space-lg);
     background: linear-gradient(135deg, var(--bg-secondary) 0%, var(--bg-tertiary) 100%);
     text-align: center;
     border-bottom: 1px solid var(--bg-tertiary);
+    flex-shrink: 0;
 }
 
 .profile-avatar {
@@ -1945,6 +1963,7 @@ h4 { font-size: var(--font-lg); }
 
 .profile-content {
     padding: var(--space-lg);
+    padding-bottom: calc(var(--space-lg) + 80px); /* Extra space for bottom */
 }
 
 .profile-section {
