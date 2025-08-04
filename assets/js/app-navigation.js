@@ -1,5 +1,10 @@
 // Modern Shooting Coach App
 // Recent changes:
+// - Fixed Android browser authentication issues with form submission and button clicks
+// - Added touchstart/touchend handlers for Android compatibility on toggle buttons
+// - Strengthened form submission prevention with multiple methods (preventDefault, stopPropagation, return false)
+// - Changed submit button from type="submit" to type="button" for better control
+// - Added Android-specific detection and event handling to prevent double-firing
 // - Fixed replay video playback speed by using actual frame timestamps instead of fixed 30fps interval
 // - Added frame rate logging to debug video generation performance
 // - Added multi-language support with language switcher in Profile page
@@ -511,6 +516,10 @@ function changeLanguage(lang) {
     updateUILanguage();
 }
 
+// Android detection
+const isAndroid = /Android/i.test(navigator.userAgent);
+const isMobile = /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent);
+
 // Initialize App
 document.addEventListener('DOMContentLoaded', async () => {
     // Set up dynamic viewport height
@@ -641,38 +650,102 @@ function setupEventListeners() {
         }
     });
     
-    // Auth toggle
+    // Auth toggle - Fixed for Android touch events
     document.querySelectorAll('.toggle-btn').forEach(btn => {
+        let touchHandled = false;
+        
+        // Handle touch events for mobile
+        btn.addEventListener('touchstart', (e) => {
+            e.preventDefault(); // Prevent ghost clicks
+            touchHandled = true;
+            
+            // Trigger the toggle action
+            toggleAuthMode(e.target);
+        }, { passive: false });
+        
+        // Handle click events for desktop (and fallback for mobile)
         btn.addEventListener('click', (e) => {
-            document.querySelectorAll('.toggle-btn').forEach(b => b.classList.remove('active'));
-            e.target.classList.add('active');
-            
-            const mode = e.target.dataset.mode;
-            const nameGroup = document.getElementById('nameGroup');
-            const handGroup = document.getElementById('handGroup');
-            const submitBtn = document.getElementById('authSubmit');
-            const landingPage = document.getElementById('landing');
-            
-            if (mode === 'signup') {
-                nameGroup.style.display = 'block';
-                handGroup.style.display = 'block';
-                submitBtn.querySelector('.btn-text').textContent = t('signup');
-                // Add signup mode class for scrolling
-                landingPage.classList.remove('login-mode');
-                landingPage.classList.add('signup-mode');
-            } else {
-                nameGroup.style.display = 'none';
-                handGroup.style.display = 'none';
-                submitBtn.querySelector('.btn-text').textContent = t('login');
-                // Add login mode class to prevent scrolling
-                landingPage.classList.remove('signup-mode');
-                landingPage.classList.add('login-mode');
+            // Skip if touch was already handled
+            if (touchHandled) {
+                touchHandled = false;
+                return;
             }
+            
+            e.preventDefault();
+            toggleAuthMode(e.target);
         });
     });
     
-    // Auth form
-    document.getElementById('authForm').addEventListener('submit', handleAuth);
+    // Extracted toggle function to avoid duplication
+    function toggleAuthMode(targetBtn) {
+        // Remove active class from all buttons
+        document.querySelectorAll('.toggle-btn').forEach(b => b.classList.remove('active'));
+        targetBtn.classList.add('active');
+        
+        const mode = targetBtn.dataset.mode;
+        const nameGroup = document.getElementById('nameGroup');
+        const handGroup = document.getElementById('handGroup');
+        const submitBtn = document.getElementById('authSubmit');
+        const landingPage = document.getElementById('landing');
+        
+        if (mode === 'signup') {
+            nameGroup.style.display = 'block';
+            handGroup.style.display = 'block';
+            submitBtn.querySelector('.btn-text').textContent = t('signup');
+            // Add signup mode class for scrolling
+            landingPage.classList.remove('login-mode');
+            landingPage.classList.add('signup-mode');
+        } else {
+            nameGroup.style.display = 'none';
+            handGroup.style.display = 'none';
+            submitBtn.querySelector('.btn-text').textContent = t('login');
+            // Add login mode class to prevent scrolling
+            landingPage.classList.remove('signup-mode');
+            landingPage.classList.add('login-mode');
+        }
+    }
+    
+    // Auth form - Strengthened submission prevention for Android
+    const authForm = document.getElementById('authForm');
+    const authSubmitBtn = document.getElementById('authSubmit');
+    
+    // Multiple layers of prevention
+    authForm.addEventListener('submit', handleAuth, { passive: false });
+    
+    // Additional prevention for Android
+    authForm.onsubmit = function(e) {
+        e.preventDefault();
+        e.stopPropagation();
+        return false;
+    };
+    
+    // Handle button click directly since it's type="button" now
+    let authSubmitting = false;
+    
+    const submitAuth = async (e) => {
+        // Prevent double submission
+        if (authSubmitting) return;
+        authSubmitting = true;
+        
+        try {
+            await handleAuth(e);
+        } finally {
+            // Reset flag after a delay to prevent rapid re-submission
+            setTimeout(() => {
+                authSubmitting = false;
+            }, 1000);
+        }
+    };
+    
+    // For Android, use touchend; for others, use click
+    if (isAndroid) {
+        authSubmitBtn.addEventListener('touchend', (e) => {
+            e.preventDefault();
+            submitAuth(e);
+        }, { passive: false });
+    } else {
+        authSubmitBtn.addEventListener('click', submitAuth, { passive: false });
+    }
     
     // Password input validation
     const passwordInput = document.getElementById('password');
@@ -787,8 +860,15 @@ function navigateTo(page) {
 
 // Auth Handler
 async function handleAuth(e) {
-    e.preventDefault();
+    // Multiple prevention methods for Android compatibility
+    if (e) {
+        e.preventDefault();
+        e.stopPropagation();
+        e.stopImmediatePropagation();
+    }
     
+    // Get form data directly to avoid timing issues
+    const form = document.getElementById('authForm');
     const mode = document.querySelector('.toggle-btn.active').dataset.mode;
     const emailOrPhone = document.getElementById('emailOrPhone').value;
     const password = document.getElementById('password').value;
@@ -855,6 +935,9 @@ async function handleAuth(e) {
         submitBtn.querySelector('.btn-text').style.display = 'block';
         submitBtn.querySelector('.btn-loader').style.display = 'none';
     }
+    
+    // Return false to prevent any default form submission (Android fallback)
+    return false;
 }
 
 // Show Home

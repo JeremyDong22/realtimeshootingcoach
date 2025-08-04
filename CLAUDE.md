@@ -141,3 +141,8 @@ The ONNX model (`basketballModel.onnx`) must be present in the root directory fo
   - This is the core logic of the application
   - Any potential changes must be approached with extreme caution
   - Preserve the complexity of the model to maintain core functionality
+
+## Development Tools
+
+- **Debugging and Experimentation**:
+  - We use the app-debug.js to debug and also use for experimenting with our new feature.
