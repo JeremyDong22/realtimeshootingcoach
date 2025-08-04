@@ -6,9 +6,12 @@
 // - Changed video generation to normal speed (1.0x) and added playback speed control (0.25x-1.25x)
 // - Added applyPreset function stub for professional mode (under development)
 // - Fixed service worker cache paths to match actual file structure
+// - Enhanced camera handling for cross-platform PWA compatibility
+// - Added Android freeze recovery and iOS PWA detection
 import { simpleAuth, simpleShots, getUserCount } from './simple-auth.js';
 import { supabase } from './supabase-client.js';
 import { t, setLanguage, getCurrentLanguage, updateUILanguage, speak, getSpeechCommand } from './i18n.js';
+import { pwaUtils } from './pwa-utils.js';
 
 // MediaPipe imports (from global scope)
 const { Pose, Camera, drawConnectors, drawLandmarks, POSE_CONNECTIONS } = window;
@@ -126,6 +129,7 @@ const state = {
     trainingStartTime: null,
     pose: null,
     camera: null,
+    cameraFacingMode: 'user', // 'user' for front camera, 'environment' for back camera
     shotDetection: {
         isTracking: false,
         wristHistory: [],
@@ -148,6 +152,222 @@ const state = {
         lastBodyWarning: null
     }
 };
+
+// Enhanced Camera Helper Class with cross-platform support
+class CameraHelper {
+    constructor() {
+        this.stream = null;
+        this.video = null;
+        this.onFrameCallback = null;
+        this.animationId = null;
+        this.facingMode = 'user'; // 'user' or 'environment'
+        this.initializationAttempts = 0;
+        this.maxRetries = 3;
+        this.androidFreezeTimeout = null;
+        this.isRecovering = false;
+    }
+    
+    async initialize(videoElement, options = {}) {
+        this.video = videoElement;
+        this.onFrameCallback = options.onFrame;
+        this.facingMode = state.cameraFacingMode || 'user';
+        this.initializationAttempts++;
+        
+        // Check platform compatibility first
+        const cameraCheck = pwaUtils.canAccessCamera();
+        if (!cameraCheck.supported && cameraCheck.issues.platformIssue) {
+            // Handle platform-specific issues
+            const recommendation = cameraCheck.recommendation;
+            throw new Error(`PLATFORM_ISSUE:${recommendation.issue}`);
+        }
+        
+        // Apply mirror effect for front camera
+        if (this.facingMode === 'user') {
+            this.video.classList.add('mirror');
+            document.getElementById('canvas').classList.add('mirror');
+        } else {
+            this.video.classList.remove('mirror');
+            document.getElementById('canvas').classList.remove('mirror');
+        }
+        
+        const constraints = {
+            video: {
+                width: { ideal: options.width || 1280 },
+                height: { ideal: options.height || 720 },
+                facingMode: this.facingMode
+            },
+            audio: false
+        };
+        
+        try {
+            // Add timeout for camera initialization
+            const initTimeout = new Promise((_, reject) => {
+                setTimeout(() => reject(new Error('CAMERA_INIT_TIMEOUT')), 10000);
+            });
+            
+            // Race between getUserMedia and timeout
+            this.stream = await Promise.race([
+                navigator.mediaDevices.getUserMedia(constraints),
+                initTimeout
+            ]);
+            
+            this.video.srcObject = this.stream;
+            
+            // Setup Android freeze detection
+            if (pwaUtils.platform.type === 'Android' && pwaUtils.isStandalone) {
+                this.setupAndroidFreezeDetection();
+            }
+            
+            // Start frame processing
+            if (this.onFrameCallback) {
+                const processFrame = () => {
+                    if (this.stream && this.onFrameCallback) {
+                        this.onFrameCallback();
+                        this.animationId = requestAnimationFrame(processFrame);
+                    }
+                };
+                // Wait for video to be ready
+                this.video.addEventListener('loadedmetadata', () => {
+                    processFrame();
+                    // Reset attempts on successful initialization
+                    this.initializationAttempts = 0;
+                });
+            }
+            
+            return this.stream;
+        } catch (error) {
+            console.error('Camera initialization error:', error);
+            
+            // Handle different error types
+            if (error.message === 'CAMERA_INIT_TIMEOUT') {
+                // Timeout - likely Android freeze
+                if (pwaUtils.platform.type === 'Android' && this.initializationAttempts < this.maxRetries) {
+                    return this.recoverFromAndroidFreeze();
+                }
+            }
+            
+            // Check if it's a permission error
+            if (error.name === 'NotAllowedError' || error.name === 'PermissionDeniedError') {
+                throw new Error('PERMISSION_DENIED');
+            }
+            
+            // Check if it's a secure context error
+            if (error.name === 'NotFoundError' || error.name === 'DevicesNotFoundError') {
+                throw new Error('CAMERA_NOT_FOUND');
+            }
+            
+            throw error;
+        }
+    }
+    
+    // Android freeze detection and recovery
+    setupAndroidFreezeDetection() {
+        let lastFrameTime = Date.now();
+        const checkInterval = 2000; // Check every 2 seconds
+        
+        this.androidFreezeTimeout = setInterval(() => {
+            const currentTime = Date.now();
+            if (currentTime - lastFrameTime > 5000 && !this.isRecovering) {
+                // No frames for 5 seconds - likely frozen
+                console.warn('Android camera freeze detected, attempting recovery...');
+                this.recoverFromAndroidFreeze();
+            }
+        }, checkInterval);
+        
+        // Update frame time on each frame
+        const originalCallback = this.onFrameCallback;
+        this.onFrameCallback = () => {
+            lastFrameTime = Date.now();
+            if (originalCallback) originalCallback();
+        };
+    }
+    
+    async recoverFromAndroidFreeze() {
+        if (this.isRecovering) return;
+        this.isRecovering = true;
+        
+        try {
+            // Stop current stream
+            this.stop();
+            
+            // Wait a moment
+            await new Promise(resolve => setTimeout(resolve, 500));
+            
+            // Try to reinitialize
+            await this.initialize(this.video, {
+                width: 1280,
+                height: 720,
+                onFrame: this.onFrameCallback
+            });
+            
+            console.log('Camera recovered from freeze');
+            
+            // Show recovery message to user
+            const statusEl = document.getElementById('trainingStatus');
+            if (statusEl) {
+                statusEl.textContent = getCurrentLanguage() === 'zh' ? 
+                    '摄像头已恢复' : 'Camera recovered';
+            }
+        } catch (err) {
+            console.error('Failed to recover from freeze:', err);
+            // If recovery fails, suggest manual recovery
+            const statusEl = document.getElementById('trainingStatus');
+            if (statusEl) {
+                statusEl.textContent = getCurrentLanguage() === 'zh' ? 
+                    '请最小化并恢复应用以修复摄像头' : 
+                    'Please minimize and restore app to fix camera';
+            }
+        } finally {
+            this.isRecovering = false;
+        }
+    }
+    
+    async switchCamera() {
+        // Toggle facing mode
+        this.facingMode = this.facingMode === 'user' ? 'environment' : 'user';
+        state.cameraFacingMode = this.facingMode;
+        
+        // Stop current stream
+        this.stop();
+        
+        // Reinitialize with new camera
+        await this.initialize(this.video, {
+            width: 1280,
+            height: 720,
+            onFrame: this.onFrameCallback
+        });
+    }
+    
+    stop() {
+        if (this.animationId) {
+            cancelAnimationFrame(this.animationId);
+            this.animationId = null;
+        }
+        
+        if (this.androidFreezeTimeout) {
+            clearInterval(this.androidFreezeTimeout);
+            this.androidFreezeTimeout = null;
+        }
+        
+        if (this.stream) {
+            this.stream.getTracks().forEach(track => track.stop());
+            this.stream = null;
+        }
+        
+        if (this.video) {
+            this.video.srcObject = null;
+        }
+    }
+    
+    start() {
+        // For compatibility with MediaPipe Camera interface
+        return this.initialize(this.video, {
+            width: 1280,
+            height: 720,
+            onFrame: this.onFrameCallback
+        });
+    }
+}
 
 // Audio Management
 class AudioManager {
@@ -274,29 +494,20 @@ document.addEventListener('DOMContentLoaded', async () => {
         updateUILanguage();
     }, 100);
     
-    // Check if user is already logged in
-    const savedUser = localStorage.getItem('shootingCoachUser');
-    if (savedUser && savedUser !== 'undefined' && savedUser !== 'null') {
-        try {
-            state.user = JSON.parse(savedUser);
-            // Navigate to the last page or home
-            const lastPage = localStorage.getItem('shootingCoachLastPage') || 'home';
-            if (lastPage !== 'landing') {
-                navigateTo(lastPage);
-                if (lastPage === 'home') {
-                    loadStats(); // Load stats when navigating to home
-                }
+    // Check if user is already logged in using session storage
+    const user = await simpleAuth.getUser();
+    if (user) {
+        state.user = user;
+        // Navigate to home or last page if stored
+        const lastPage = sessionStorage.getItem('shootingCoachLastPage') || 'home';
+        if (lastPage !== 'landing') {
+            navigateTo(lastPage);
+            if (lastPage === 'home') {
+                loadStats(); // Load stats when navigating to home
             }
-        } catch (e) {
-            console.error('Error parsing saved user:', e);
-            localStorage.removeItem('shootingCoachUser');
-            simpleAuth.signOut();
-            state.user = null;
-            navigateTo('landing');
         }
     } else {
-        // Clear any existing session to ensure clean login
-        simpleAuth.signOut();
+        // No authenticated user, show landing page
         state.user = null;
         navigateTo('landing');
     }
@@ -488,9 +699,9 @@ function navigateTo(page) {
         pageEl.classList.add('active');
         state.currentPage = page;
         
-        // Save current page to localStorage (except for landing)
+        // Save current page to session storage (except for landing)
         if (page !== 'landing' && state.user) {
-            localStorage.setItem('shootingCoachLastPage', page);
+            sessionStorage.setItem('shootingCoachLastPage', page);
         }
         
         // Update navbar - show for all pages except landing
@@ -577,8 +788,7 @@ async function handleAuth(e) {
             alert(result.error.message);
         } else {
             state.user = result.data;
-            // Save user to localStorage
-            localStorage.setItem('shootingCoachUser', JSON.stringify(result.data));
+            // User is saved in Supabase, no need for localStorage
             
             if (mode === 'signup') {
                 alert(getCurrentLanguage() === 'zh' ? `欢迎 ${name}！您是第${result.data.id}/1000位用户` : `Welcome ${name}! You are user #${result.data.id}/1000`);
@@ -892,40 +1102,110 @@ async function initializeMediaPipe() {
         state.visibilityStartTime = null;
         state.requiredVisibilityDuration = 500; // 500ms visibility requirement
         
-        // Try to use MediaPipe Camera first, fallback to CameraHelper if needed
+        // Use CameraHelper for camera management (supports camera switching)
         try {
-            // Check if MediaPipe Camera is available
-            if (typeof Camera !== 'undefined') {
-                state.camera = new Camera(videoElement, {
-                    onFrame: async () => {
-                        if (state.pose && state.isTraining) {
-                            try {
-                                await state.pose.send({image: videoElement});
-                            } catch (err) {
-                                console.error(' Error sending frame to pose:', err);
-                            }
+            state.cameraHelper = new CameraHelper();
+            
+            // Frame rate throttling for better performance
+            let lastFrameTime = 0;
+            const frameInterval = 1000 / 30; // Limit to 30fps for pose detection
+            
+            await state.cameraHelper.initialize(videoElement, {
+                width: 1280,
+                height: 720,
+                onFrame: async () => {
+                    const currentTime = performance.now();
+                    if (currentTime - lastFrameTime < frameInterval) {
+                        return; // Skip frame to maintain target fps
+                    }
+                    lastFrameTime = currentTime;
+                    
+                    if (state.pose && state.isTraining) {
+                        try {
+                            await state.pose.send({image: videoElement});
+                        } catch (err) {
+                            console.error('Error sending frame to pose:', err);
                         }
-                    },
-                    width: 1280,
-                    height: 720
-                });
-                
-                await state.camera.start();
-            } else {
-                throw new Error('MediaPipe Camera not available');
+                    }
+                }
+            });
+            
+            // Setup camera flip button
+            const flipBtn = document.getElementById('cameraFlipBtn');
+            if (flipBtn) {
+                flipBtn.style.display = 'flex';
+                flipBtn.onclick = async () => {
+                    try {
+                        await state.cameraHelper.switchCamera();
+                    } catch (err) {
+                        console.error('Error switching camera:', err);
+                    }
+                };
             }
+            
+            // Setup double-tap gesture for camera switching with passive listener
+            let lastTapTime = 0;
+            videoElement.addEventListener('touchstart', (e) => {
+                const currentTime = new Date().getTime();
+                const tapLength = currentTime - lastTapTime;
+                if (tapLength < 500 && tapLength > 0) {
+                    // Double tap detected
+                    if (state.cameraHelper) {
+                        state.cameraHelper.switchCamera().catch(console.error);
+                    }
+                }
+                lastTapTime = currentTime;
+            }, { passive: true }); // Make listener passive for better scrolling performance
+            
         } catch (cameraError) {
-            console.warn('MediaPipe Camera failed, using fallback:', cameraError);
+            console.error('Camera initialization failed:', cameraError);
+            
+            // Get platform-specific recommendations
+            const cameraCheck = pwaUtils.canAccessCamera();
+            const recommendation = cameraCheck.recommendation;
+            
+            // Handle platform-specific issues
+            if (cameraError.message && cameraError.message.includes('PLATFORM_ISSUE:')) {
+                const issue = cameraError.message.split(':')[1];
+                
+                if (issue === 'iOS_PWA_CAMERA_BLOCKED') {
+                    // iOS PWA camera blocked
+                    document.getElementById('trainingStatus').textContent = getCurrentLanguage() === 'zh' ? 
+                        'iOS应用模式无法访问摄像头' : 'Camera blocked in iOS app mode';
+                    
+                    // Show detailed instructions with button to open in browser
+                    const message = getCurrentLanguage() === 'zh' ? 
+                        'iOS限制：安装的应用无法使用摄像头\n\n解决方法：\n1. 点击分享按钮\n2. 选择"在Safari中打开"\n3. 在浏览器中使用摄像头功能' :
+                        'iOS Limitation: Installed apps cannot access camera\n\nSolution:\n1. Tap the share button\n2. Select "Open in Safari"\n3. Use camera in browser mode';
+                    
+                    alert(message);
+                    
+                    // Add button to help users
+                    showCameraAlternatives('ios_pwa');
+                    return;
+                } else if (issue === 'ANDROID_PWA_FREEZE') {
+                    // Android PWA may freeze - provide guidance
+                    document.getElementById('trainingStatus').textContent = getCurrentLanguage() === 'zh' ? 
+                        '提示：如摄像头冻结，请最小化并恢复应用' : 'Tip: If camera freezes, minimize and restore app';
+                }
+            }
+            
+            // Check for other common errors
+            if (cameraError.message === 'PERMISSION_DENIED') {
+                document.getElementById('trainingStatus').textContent = getCurrentLanguage() === 'zh' ? 
+                    '摄像头权限被拒绝' : 'Camera permission denied';
+                showCameraPermissionGuide();
+                return;
+            }
+            
+            if (cameraError.message === 'CAMERA_NOT_FOUND') {
+                document.getElementById('trainingStatus').textContent = getCurrentLanguage() === 'zh' ? 
+                    '未找到摄像头设备' : 'No camera device found';
+                return;
+            }
             
             // Check if we're in PWA mode without HTTPS
-            const isPWA = window.matchMedia('(display-mode: standalone)').matches || 
-                          window.navigator.standalone === true;
-            const isHTTPS = window.location.protocol === 'https:';
-            const isLocalhost = window.location.hostname === 'localhost' || 
-                               window.location.hostname === '127.0.0.1';
-            
-            if (isPWA && !isHTTPS && !isLocalhost) {
-                // Show HTTPS requirement message
+            if (!window.isSecureContext) {
                 document.getElementById('trainingStatus').textContent = getCurrentLanguage() === 'zh' ? 
                     '需要HTTPS连接才能访问摄像头' : 'HTTPS required for camera access';
                 alert(getCurrentLanguage() === 'zh' ? 
@@ -935,26 +1215,7 @@ async function initializeMediaPipe() {
                 return;
             }
             
-            // Use our CameraHelper as fallback
-            if (typeof CameraHelper !== 'undefined') {
-                state.cameraHelper = new CameraHelper();
-                
-                await state.cameraHelper.initialize(videoElement, {
-                    width: 1280,
-                    height: 720,
-                    onFrame: async () => {
-                        if (state.pose && state.isTraining) {
-                            try {
-                                await state.pose.send({image: videoElement});
-                            } catch (err) {
-                                console.error('Error sending frame to pose:', err);
-                            }
-                        }
-                    }
-                });
-            } else {
-                throw new Error('No camera implementation available');
-            }
+            throw cameraError;
         }
         
         // Show countdown overlay
@@ -1763,13 +2024,22 @@ function stopTraining() {
     }
     
     // Stop camera
-    if (state.camera) {
-        state.camera.stop();
-        state.camera = null;
-    } else if (state.cameraHelper) {
+    if (state.cameraHelper) {
         state.cameraHelper.stop();
         state.cameraHelper = null;
     }
+    
+    // Hide camera flip button
+    const flipBtn = document.getElementById('cameraFlipBtn');
+    if (flipBtn) {
+        flipBtn.style.display = 'none';
+    }
+    
+    // Remove mirror effect
+    const video = document.getElementById('video');
+    const canvas = document.getElementById('canvas');
+    if (video) video.classList.remove('mirror');
+    if (canvas) canvas.classList.remove('mirror');
     
     // No longer using recording interval
     
@@ -1795,9 +2065,19 @@ function stopTraining() {
     }, 100);
 }
 
-// Exit Training
+// Exit Training - Optimized without blocking confirm dialog
 function exitTraining() {
-    if (confirm('End training session?')) {
+    // Instead of blocking confirm, stop immediately and show a brief message
+    const wasTraining = state.isTraining;
+    
+    if (wasTraining) {
+        // Show exit message briefly
+        const statusEl = document.getElementById('trainingStatus');
+        if (statusEl) {
+            statusEl.textContent = getCurrentLanguage() === 'zh' ? '训练已结束' : 'Training ended';
+        }
+        
+        // Stop training immediately without blocking
         stopTraining();
     }
 }
@@ -2050,23 +2330,16 @@ document.addEventListener('DOMContentLoaded', () => {
 });
 
 // Show Profile
-function showProfile() {
+async function showProfile() {
     console.log('showProfile called, state.user:', state.user);
     
     if (!state.user) {
         console.error('No user found in state');
-        // Try to get user from localStorage
-        const savedUser = localStorage.getItem('shootingCoachUser');
-        if (savedUser && savedUser !== 'undefined' && savedUser !== 'null') {
-            try {
-                state.user = JSON.parse(savedUser);
-                console.log('Loaded user from localStorage:', state.user);
-            } catch (e) {
-                console.error('Failed to parse saved user:', e);
-                alert('Please log in again');
-                navigateTo('landing');
-                return;
-            }
+        // Try to get user from Supabase auth
+        const user = await simpleAuth.getUser();
+        if (user) {
+            state.user = user;
+            console.log('Loaded user from Supabase:', state.user);
         } else {
             alert('Please log in first');
             navigateTo('landing');
@@ -2082,7 +2355,7 @@ function showProfile() {
     document.getElementById('profileBadge').textContent = `${t('elitePlayer')} #${state.user.id}`;
     
     // Update shooting hand selection
-    const userHand = state.user.shooting_hand || localStorage.getItem('shootingHand') || 'right';
+    const userHand = state.user.shooting_hand || state.user.user_metadata?.shooting_hand || 'right';
     document.querySelectorAll('.hand-btn').forEach(btn => {
         btn.classList.remove('active');
     });
@@ -2660,12 +2933,21 @@ window.changeLanguage = changeLanguage;
 // Change shooting hand function
 function changeShootingHand(hand) {
     // Save preference to localStorage
-    localStorage.setItem('shootingHand', hand);
+    // Shooting hand is now saved in Supabase user metadata
     
     // Update user profile if logged in
     if (state.user) {
         state.user.shooting_hand = hand;
-        localStorage.setItem('shootingCoachUser', JSON.stringify(state.user));
+        // Update in database
+        supabase.from('sc_simple_users')
+            .update({ shooting_hand: hand })
+            .eq('id', state.user.id)
+            .then(() => {
+                console.log('Shooting hand updated in database');
+                // Update session storage
+                sessionStorage.setItem('shootingCoachUser', JSON.stringify(state.user));
+            })
+            .catch(console.error);
     }
     
     // Update active button
@@ -2686,12 +2968,11 @@ function changeShootingHand(hand) {
 }
 
 // Initialize shooting hand preference
-const savedHand = localStorage.getItem('shootingHand') || 'right';
-state.shootingHand = savedHand;
+state.shootingHand = 'right'; // Default, will be updated when user loads
 
 // Set the correct button as active on load
 document.addEventListener('DOMContentLoaded', () => {
-    if (savedHand === 'left') {
+    if (state.shootingHand === 'left') {
         document.getElementById('handRight')?.classList.remove('active');
         document.getElementById('handLeft')?.classList.add('active');
     }
@@ -3321,4 +3602,174 @@ window.proceedToCamera = proceedToCamera;
 window.state = state;
 window.deleteVideo = deleteVideo;
 window.loadSessions = loadSessions;
+
+// Camera Alternative Functions for Platform Issues
+function showCameraAlternatives(issueType) {
+    const trainingView = document.getElementById('training');
+    if (!trainingView) return;
+    
+    // Create alternative UI
+    const alternativeUI = document.createElement('div');
+    alternativeUI.className = 'camera-alternatives';
+    alternativeUI.style.cssText = `
+        position: fixed;
+        top: 50%;
+        left: 50%;
+        transform: translate(-50%, -50%);
+        background: white;
+        padding: 20px;
+        border-radius: 12px;
+        box-shadow: 0 4px 12px rgba(0,0,0,0.15);
+        z-index: 1000;
+        text-align: center;
+        max-width: 90%;
+        width: 350px;
+    `;
+    
+    if (issueType === 'ios_pwa') {
+        alternativeUI.innerHTML = `
+            <h3 style="margin-bottom: 15px; color: #333;">
+                ${getCurrentLanguage() === 'zh' ? '摄像头访问受限' : 'Camera Access Limited'}
+            </h3>
+            <p style="margin-bottom: 20px; color: #666; font-size: 14px;">
+                ${getCurrentLanguage() === 'zh' ? 
+                    'iOS应用模式不支持摄像头。请选择以下选项：' : 
+                    'iOS app mode doesn\'t support camera. Please choose:'}
+            </p>
+            <button onclick="window.open(window.location.href, '_blank')" 
+                    style="width: 100%; padding: 12px; margin-bottom: 10px; 
+                           background: #007AFF; color: white; border: none; 
+                           border-radius: 8px; font-size: 16px; cursor: pointer;">
+                ${getCurrentLanguage() === 'zh' ? '在Safari中打开' : 'Open in Safari'}
+            </button>
+            <button onclick="showManualInstructions()" 
+                    style="width: 100%; padding: 12px; margin-bottom: 10px; 
+                           background: #34C759; color: white; border: none; 
+                           border-radius: 8px; font-size: 16px; cursor: pointer;">
+                ${getCurrentLanguage() === 'zh' ? '查看详细说明' : 'View Instructions'}
+            </button>
+            <button onclick="useFallbackCamera()" 
+                    style="width: 100%; padding: 12px; margin-bottom: 10px; 
+                           background: #FF9500; color: white; border: none; 
+                           border-radius: 8px; font-size: 16px; cursor: pointer;">
+                ${getCurrentLanguage() === 'zh' ? '使用文件上传' : 'Use File Upload'}
+            </button>
+            <button onclick="this.parentElement.remove(); navigateTo('home')" 
+                    style="width: 100%; padding: 12px; background: #8E8E93; 
+                           color: white; border: none; border-radius: 8px; 
+                           font-size: 16px; cursor: pointer;">
+                ${getCurrentLanguage() === 'zh' ? '返回主页' : 'Return Home'}
+            </button>
+        `;
+    }
+    
+    trainingView.appendChild(alternativeUI);
+}
+
+function showCameraPermissionGuide() {
+    const platform = pwaUtils.platform.type;
+    let instructions = '';
+    
+    if (platform === 'iOS') {
+        instructions = getCurrentLanguage() === 'zh' ? 
+            '设置步骤：\n1. 打开设置\n2. 找到Safari浏览器\n3. 进入"网站设置"\n4. 允许摄像头访问' :
+            'Setup steps:\n1. Open Settings\n2. Find Safari\n3. Go to "Website Settings"\n4. Allow camera access';
+    } else if (platform === 'Android') {
+        instructions = getCurrentLanguage() === 'zh' ? 
+            '设置步骤：\n1. 点击地址栏左侧的锁图标\n2. 选择"网站设置"\n3. 允许摄像头权限\n4. 刷新页面' :
+            'Setup steps:\n1. Tap the lock icon in address bar\n2. Select "Site settings"\n3. Allow camera permission\n4. Refresh the page';
+    } else {
+        instructions = getCurrentLanguage() === 'zh' ? 
+            '请在浏览器设置中允许摄像头访问权限' :
+            'Please allow camera access in browser settings';
+    }
+    
+    alert(instructions);
+}
+
+function showManualInstructions() {
+    const instructions = getCurrentLanguage() === 'zh' ? 
+        'iOS手动操作说明：\n\n' +
+        '1. 点击底部分享按钮（方框带箭头图标）\n' +
+        '2. 在分享菜单中选择"在Safari中打开"\n' +
+        '3. 等待页面在Safari中加载\n' +
+        '4. 点击"开始训练"使用摄像头\n\n' +
+        '注意：这是iOS系统限制，非应用问题' :
+        'iOS Manual Instructions:\n\n' +
+        '1. Tap the share button at bottom (box with arrow)\n' +
+        '2. Select "Open in Safari" from the menu\n' +
+        '3. Wait for page to load in Safari\n' +
+        '4. Tap "Start Training" to use camera\n\n' +
+        'Note: This is an iOS system limitation';
+    
+    alert(instructions);
+}
+
+// Fallback camera using file input
+function useFallbackCamera() {
+    const trainingView = document.getElementById('training');
+    if (!trainingView) return;
+    
+    // Create file input for camera capture
+    const fileInput = document.createElement('input');
+    fileInput.type = 'file';
+    fileInput.accept = 'video/*';
+    fileInput.capture = 'environment'; // Use back camera if available
+    fileInput.style.display = 'none';
+    
+    fileInput.onchange = async (e) => {
+        const file = e.target.files[0];
+        if (file) {
+            // Process the video file
+            const videoUrl = URL.createObjectURL(file);
+            const video = document.getElementById('video');
+            if (video) {
+                video.src = videoUrl;
+                video.play();
+                
+                document.getElementById('trainingStatus').textContent = getCurrentLanguage() === 'zh' ? 
+                    '视频已加载 - 分析中...' : 'Video loaded - Analyzing...';
+                
+                // Note: This is a fallback - MediaPipe analysis won't work on uploaded video
+                alert(getCurrentLanguage() === 'zh' ? 
+                    '提示：上传模式仅供查看，无法进行实时姿势分析' : 
+                    'Note: Upload mode is for viewing only, real-time pose analysis not available');
+            }
+        }
+    };
+    
+    // Clear any existing alternatives UI
+    const alternativesUI = document.querySelector('.camera-alternatives');
+    if (alternativesUI) alternativesUI.remove();
+    
+    // Trigger file selection
+    document.body.appendChild(fileInput);
+    fileInput.click();
+    document.body.removeChild(fileInput);
+}
+
+// Add diagnostic function for testing
+window.testCameraAccess = async function() {
+    const diagnostics = pwaUtils.getDiagnostics();
+    console.log('Platform Diagnostics:', diagnostics);
+    
+    // Try to access camera
+    try {
+        const stream = await navigator.mediaDevices.getUserMedia({ video: true });
+        stream.getTracks().forEach(track => track.stop());
+        console.log('✅ Camera access successful');
+        alert('Camera test successful!');
+    } catch (err) {
+        console.error('❌ Camera access failed:', err);
+        alert(`Camera test failed: ${err.message}`);
+    }
+    
+    return diagnostics;
+};
+
+// Export helper functions to window
+window.showCameraAlternatives = showCameraAlternatives;
+window.showCameraPermissionGuide = showCameraPermissionGuide;
+window.showManualInstructions = showManualInstructions;
+window.useFallbackCamera = useFallbackCamera;
 

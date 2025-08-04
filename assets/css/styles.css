@@ -987,6 +987,50 @@ h4 { font-size: var(--font-lg); }
     object-fit: cover;
 }
 
+/* Mirror effect for front camera */
+#video.mirror {
+    transform: scaleX(-1);
+}
+
+#canvas.mirror {
+    transform: scaleX(-1);
+}
+
+/* Camera Flip Button */
+.camera-flip-btn {
+    position: absolute;
+    top: var(--space-md);
+    right: var(--space-md);
+    width: 44px;
+    height: 44px;
+    border-radius: 50%;
+    background: rgba(0, 0, 0, 0.6);
+    backdrop-filter: blur(10px);
+    border: 1px solid rgba(255, 255, 255, 0.2);
+    color: var(--text-primary);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    cursor: pointer;
+    transition: all 0.3s ease;
+    z-index: 10;
+}
+
+.camera-flip-btn:hover {
+    background: rgba(255, 107, 53, 0.3);
+    border-color: var(--accent-primary);
+    transform: scale(1.1);
+}
+
+.camera-flip-btn:active {
+    transform: scale(0.95);
+}
+
+.camera-flip-btn svg {
+    width: 24px;
+    height: 24px;
+}
+
 /* Shot Detection Overlay */
 .shot-overlay {
     position: absolute;

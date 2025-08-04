@@ -8,8 +8,5 @@
 const SUPABASE_URL = '__VITE_SUPABASE_URL__';
 const SUPABASE_ANON_KEY = '__VITE_SUPABASE_ANON_KEY__';
 
-// Check if we're using mock mode (for development without Supabase)
-const USE_MOCK = false;
-
 // Export configuration
-export { SUPABASE_URL, SUPABASE_ANON_KEY, USE_MOCK };
+export { SUPABASE_URL, SUPABASE_ANON_KEY };

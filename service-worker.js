@@ -1,61 +1,94 @@
-const CACHE_NAME = 'shooting-coach-v2';
+// Service Worker - Version 5.0
+// Enhanced for cross-platform PWA compatibility
+const CACHE_NAME = 'shooting-coach-v5-enhanced';
 const urlsToCache = [
   '/',
   '/index.html',
   '/manifest.json',
   '/assets/css/styles.css',
   '/assets/css/pwa-installer.css',
-  '/assets/js/app-navigation.js',
-  '/assets/js/simple-auth.js',
-  '/assets/js/supabase-client.js',
-  '/assets/js/supabase-config.js',
-  '/assets/js/i18n.js',
-  '/assets/js/batch-selection.js',
-  '/assets/js/pwa-installer.js',
   '/assets/icons/android-chrome-192x192.png',
   '/assets/icons/android-chrome-512x512.png',
   '/assets/icons/apple-touch-icon.png',
   '/assets/icons/favicon.ico'
 ];
 
+// DO NOT CACHE JavaScript files or media streams
+const NO_CACHE_PATTERNS = [
+  /\.js$/,
+  /\.js\?/,
+  /app-navigation/,
+  /simple-auth/,
+  /supabase/,
+  /pwa-utils/,
+  /mediaDevices/,
+  /getUserMedia/
+];
+
 // Install event - cache resources
 self.addEventListener('install', event => {
+  console.log('Service Worker v5.0 installing...');
+  // Skip waiting to activate immediately
+  self.skipWaiting();
+  
   event.waitUntil(
     caches.open(CACHE_NAME)
       .then(cache => {
-        console.log('Opened cache');
+        console.log('Opened cache v5.0');
         return cache.addAll(urlsToCache);
       })
   );
 });
 
-// Fetch event - serve from cache when offline
+// Fetch event - Network first for JS files
 self.addEventListener('fetch', event => {
-  event.respondWith(
-    caches.match(event.request)
-      .then(response => {
-        // Cache hit - return response
-        if (response) {
-          return response;
-        }
-        return fetch(event.request);
-      }
-    )
-  );
+  const url = new URL(event.request.url);
+  
+  // Check if this is a JS file or API call
+  const shouldNotCache = NO_CACHE_PATTERNS.some(pattern => pattern.test(url.pathname));
+  
+  if (shouldNotCache) {
+    // Always fetch from network for JS files
+    event.respondWith(
+      fetch(event.request).catch(() => {
+        // If network fails, try cache as fallback
+        return caches.match(event.request);
+      })
+    );
+  } else {
+    // Cache first for other resources
+    event.respondWith(
+      caches.match(event.request)
+        .then(response => {
+          if (response) {
+            return response;
+          }
+          return fetch(event.request);
+        })
+    );
+  }
 });
 
 // Activate event - clean up old caches
 self.addEventListener('activate', event => {
+  console.log('Service Worker v5.0 activating...');
   const cacheWhitelist = [CACHE_NAME];
+  
   event.waitUntil(
-    caches.keys().then(cacheNames => {
-      return Promise.all(
-        cacheNames.map(cacheName => {
-          if (cacheWhitelist.indexOf(cacheName) === -1) {
-            return caches.delete(cacheName);
-          }
-        })
-      );
-    })
+    Promise.all([
+      // Take control immediately
+      self.clients.claim(),
+      // Delete old caches
+      caches.keys().then(cacheNames => {
+        return Promise.all(
+          cacheNames.map(cacheName => {
+            if (cacheWhitelist.indexOf(cacheName) === -1) {
+              console.log('Deleting old cache:', cacheName);
+              return caches.delete(cacheName);
+            }
+          })
+        );
+      })
+    ])
   );
 });
