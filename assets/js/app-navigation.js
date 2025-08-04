@@ -1099,19 +1099,26 @@ async function initializeMediaPipe() {
             return;
         }
         
+        // Check if running on mobile
+        const isMobile = /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent);
+        console.log('📱 Initializing MediaPipe for', isMobile ? 'mobile' : 'desktop');
+        
         // Initialize Pose
         state.pose = new Pose({
             locateFile: (file) => `https://cdn.jsdelivr.net/npm/@mediapipe/pose/${file}`
         });
         
+        // Mobile-optimized settings
         state.pose.setOptions({
-            modelComplexity: 1,
+            modelComplexity: isMobile ? 0 : 1,  // Use lighter model on mobile
             smoothLandmarks: true,
-            minDetectionConfidence: 0.5,
-            minTrackingConfidence: 0.5,
+            minDetectionConfidence: isMobile ? 0.3 : 0.5,  // Lower threshold for mobile
+            minTrackingConfidence: isMobile ? 0.3 : 0.5,
             enableSegmentation: false,  // Disable segmentation for better performance
             smoothSegmentation: false
         });
+        
+        console.log('🎆 MediaPipe options set for', isMobile ? 'mobile' : 'desktop');
         
         state.pose.onResults(onPoseResults);
         
@@ -1121,16 +1128,38 @@ async function initializeMediaPipe() {
             '正在初始化姿势检测...' : 'Initializing pose detection...';
         
         try {
-            // Add timeout for MediaPipe initialization
+            // Add longer timeout for mobile devices
+            const isMobile = /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent);
+            const timeoutDuration = isMobile ? 30000 : 15000;  // 30s for mobile, 15s for desktop
+            
             const initTimeout = new Promise((_, reject) => {
-                setTimeout(() => reject(new Error('MediaPipe initialization timeout')), 15000);
+                setTimeout(() => reject(new Error('MediaPipe initialization timeout')), timeoutDuration);
             });
             
-            // Initialize pose with timeout
-            await Promise.race([
-                state.pose.initialize(),
-                initTimeout
-            ]);
+            console.log('⏳ Initializing MediaPipe with', timeoutDuration/1000, 'second timeout...');
+            
+            // Initialize pose with timeout and retry logic for mobile
+            let initialized = false;
+            let retries = isMobile ? 2 : 1;  // Allow 2 retries on mobile
+            
+            while (!initialized && retries > 0) {
+                try {
+                    await Promise.race([
+                        state.pose.initialize(),
+                        initTimeout
+                    ]);
+                    initialized = true;
+                } catch (err) {
+                    retries--;
+                    if (retries > 0) {
+                        console.log('⚠️ Retrying MediaPipe initialization...', retries, 'attempts left');
+                        // Wait a bit before retry
+                        await new Promise(resolve => setTimeout(resolve, 2000));
+                    } else {
+                        throw err;
+                    }
+                }
+            }
             
             console.log('✅ MediaPipe initialized successfully');
         } catch (poseError) {
