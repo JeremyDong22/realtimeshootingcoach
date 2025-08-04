@@ -165,7 +165,7 @@ class CameraHelper {
         this.video = null;
         this.onFrameCallback = null;
         this.animationId = null;
-        this.facingMode = 'user'; // 'user' or 'environment'
+        this.facingMode = 'environment'; // Default to back camera for better body detection
         this.initializationAttempts = 0;
         this.maxRetries = 3;
         this.androidFreezeTimeout = null;
@@ -175,7 +175,7 @@ class CameraHelper {
     async initialize(videoElement, options = {}) {
         this.video = videoElement;
         this.onFrameCallback = options.onFrame;
-        this.facingMode = state.cameraFacingMode || 'user';
+        this.facingMode = state.cameraFacingMode || 'environment';
         this.initializationAttempts++;
         
         // Check platform compatibility first
@@ -213,8 +213,6 @@ class CameraHelper {
             audio: false
         };
         
-        console.log('📱 Mobile device:', isMobile);
-        console.log('🎥 Camera constraints:', constraints);
         
         try {
             // Add timeout for camera initialization
@@ -227,15 +225,11 @@ class CameraHelper {
                 throw new Error('getUserMedia not supported');
             }
             
-            console.log('🔍 Requesting camera permission...');
-            
             // Race between getUserMedia and timeout
             this.stream = await Promise.race([
                 navigator.mediaDevices.getUserMedia(constraints),
                 initTimeout
             ]);
-            
-            console.log('✅ Camera stream obtained');
             
             this.video.srcObject = this.stream;
             
@@ -248,12 +242,10 @@ class CameraHelper {
             // Wait for video to be ready
             await new Promise((resolve) => {
                 this.video.onloadedmetadata = () => {
-                    console.log('✅ Video metadata loaded');
                     this.video.play().then(() => {
-                        console.log('✅ Video playing');
                         resolve();
                     }).catch(err => {
-                        console.error('❌ Video play error:', err);
+                        console.error('Video play error:', err);
                         resolve(); // Continue anyway
                     });
                 };
@@ -272,12 +264,18 @@ class CameraHelper {
                         this.animationId = requestAnimationFrame(processFrame);
                     }
                 };
-                // Wait for video to be ready
-                this.video.addEventListener('loadedmetadata', () => {
+                
+                // Check if video is already ready or wait for it
+                if (this.video.readyState >= this.video.HAVE_METADATA) {
                     processFrame();
-                    // Reset attempts on successful initialization
                     this.initializationAttempts = 0;
-                });
+                } else {
+                    this.video.addEventListener('loadedmetadata', () => {
+                        processFrame();
+                        // Reset attempts on successful initialization
+                        this.initializationAttempts = 0;
+                    });
+                }
             }
             
             return this.stream;
@@ -550,7 +548,11 @@ document.addEventListener('DOMContentLoaded', async () => {
         state.user = user;
         // Navigate to home or last page if stored
         const lastPage = sessionStorage.getItem('shootingCoachLastPage') || 'home';
-        if (lastPage !== 'landing') {
+        // Don't restore training page on refresh - always go to home instead
+        if (lastPage === 'training' || lastPage === 'trainingSetup' || lastPage === 'trainingInstructions') {
+            navigateTo('home');
+            loadStats();
+        } else if (lastPage !== 'landing') {
             navigateTo(lastPage);
             if (lastPage === 'home') {
                 loadStats(); // Load stats when navigating to home
@@ -567,6 +569,22 @@ document.addEventListener('DOMContentLoaded', async () => {
     
     // Setup event listeners
     setupEventListeners();
+});
+
+// Clean up resources before page unload
+window.addEventListener('beforeunload', () => {
+    // Stop camera and MediaPipe if active
+    if (state.cameraHelper) {
+        state.cameraHelper.stop();
+    }
+    if (state.pose) {
+        state.pose.close();
+    }
+    // Stop any ongoing recording
+    if (state.isRecording && state.mediaRecorder) {
+        state.mediaRecorder.stop();
+        state.isRecording = false;
+    }
 });
 
 // Handle dynamic viewport height for mobile browsers
@@ -1178,15 +1196,66 @@ function startTrainingTimer() {
     }
 }
 
+// Helper function to load MediaPipe scripts dynamically
+async function loadMediaPipeScripts() {
+    const scripts = [
+        'https://cdn.jsdelivr.net/npm/@mediapipe/camera_utils/camera_utils.js',
+        'https://cdn.jsdelivr.net/npm/@mediapipe/control_utils/control_utils.js',
+        'https://cdn.jsdelivr.net/npm/@mediapipe/drawing_utils/drawing_utils.js',
+        'https://cdn.jsdelivr.net/npm/@mediapipe/pose/pose.js'
+    ];
+    
+    for (const src of scripts) {
+        const scriptId = src.split('/').pop().replace('.js', '');
+        
+        // Check if script already exists
+        if (document.querySelector(`script[src="${src}"]`)) {
+            console.log(`✅ Script already loaded: ${scriptId}`);
+            continue;
+        }
+        
+        console.log(`📥 Loading script: ${scriptId}`);
+        const script = document.createElement('script');
+        script.src = src;
+        script.async = false;
+        
+        await new Promise((resolve, reject) => {
+            script.onload = () => {
+                console.log(`✅ Loaded: ${scriptId}`);
+                resolve();
+            };
+            script.onerror = () => {
+                console.error(`❌ Failed to load: ${scriptId}`);
+                reject(new Error(`Failed to load ${src}`));
+            };
+            document.head.appendChild(script);
+        });
+    }
+    
+    // Wait a bit for scripts to initialize
+    await new Promise(resolve => setTimeout(resolve, 1000));
+}
+
 // Initialize MediaPipe
 async function initializeMediaPipe() {
     try {
-        // Initializing MediaPipe...
+        // Wait for MediaPipe to be available if not loaded yet
+        let retries = 0;
+        const maxRetries = 10;
+        while (!window.Pose && retries < maxRetries) {
+            await new Promise(resolve => setTimeout(resolve, 500));
+            retries++;
+        }
         
         if (!window.Pose) {
-            console.error(' Pose not available in window!');
-            document.getElementById('trainingStatus').textContent = 'Error: MediaPipe not loaded';
-            return;
+            // Try to reload MediaPipe scripts
+            await loadMediaPipeScripts();
+            
+            // Final check
+            if (!window.Pose) {
+                document.getElementById('trainingStatus').textContent = 'Error: MediaPipe not loaded';
+                return;
+            }
         }
         
         // Initialize Pose
@@ -1219,15 +1288,11 @@ async function initializeMediaPipe() {
                 setTimeout(() => reject(new Error('MediaPipe initialization timeout')), timeoutDuration);
             });
             
-            console.log('⏳ Initializing MediaPipe with', timeoutDuration/1000, 'second timeout...');
-            
             // Initialize pose with timeout
             await Promise.race([
                 state.pose.initialize(),
                 initTimeout
             ]);
-            
-            console.log('✅ MediaPipe initialized successfully');
         } catch (poseError) {
             console.error('❌ MediaPipe initialization failed:', poseError);
             document.getElementById('trainingStatus').textContent = getCurrentLanguage() === 'zh' ? 
@@ -1274,15 +1339,41 @@ async function initializeMediaPipe() {
             let lastFrameTime = 0;
             const frameInterval = 1000 / 30; // Limit to 30fps for pose detection
             
-            // Add detailed logging for mobile debugging
-            console.log('📱 Initializing camera...');
-            console.log('Platform:', navigator.userAgent);
-            console.log('HTTPS:', window.location.protocol === 'https:');
+            
+            let frameCount = 0;
+            let isVideoReady = false;
+            
+            // Wait for video to be fully ready
+            const waitForVideo = async () => {
+                return new Promise((resolve) => {
+                    const checkVideo = () => {
+                        if (videoElement.videoWidth > 0 && videoElement.videoHeight > 0) {
+                            isVideoReady = true;
+                            resolve();
+                        } else {
+                            setTimeout(checkVideo, 100);
+                        }
+                    };
+                    checkVideo();
+                });
+            };
             
             await state.cameraHelper.initialize(videoElement, {
                 width: 1280,
                 height: 720,
                 onFrame: async () => {
+                    frameCount++;
+                    
+                    // Skip first 10 frames to let video stabilize completely
+                    if (frameCount < 10) {
+                        return;
+                    }
+                    
+                    // Ensure video is ready
+                    if (!isVideoReady) {
+                        await waitForVideo();
+                    }
+                    
                     const currentTime = performance.now();
                     if (currentTime - lastFrameTime < frameInterval) {
                         return; // Skip frame to maintain target fps
@@ -1326,7 +1417,8 @@ async function initializeMediaPipe() {
                 lastTapTime = currentTime;
             }, { passive: true }); // Make listener passive for better scrolling performance
             
-            console.log('✅ Camera initialized successfully');
+            // Add a delay to ensure video stream is fully stable before processing
+            await new Promise(resolve => setTimeout(resolve, 1500)); // 1.5 second delay
             
             // Update status for mobile users
             document.getElementById('trainingStatus').textContent = getCurrentLanguage() === 'zh' ? 
@@ -1499,8 +1591,10 @@ let poseFrameCount = 0;
 let lastProcessTime = 0;
 const PROCESS_INTERVAL = 50; // Process every 50ms (20 FPS) for better performance
 
+let poseResultCount = 0;
 function onPoseResults(results) {
     try {
+        
         // Throttle processing to improve performance
         const now = Date.now();
         if (now - lastProcessTime < PROCESS_INTERVAL) {
