@@ -1546,7 +1546,7 @@ async function initializeMediaPipe() {
 function startRecording() {
     const video = document.getElementById('video');
     const canvas = document.getElementById('canvas');
-    const ctx = canvas.getContext('2d', { willReadFrequently: true });
+    const ctx = canvas.getContext('2d');
     
     
     // Set canvas size
@@ -1593,22 +1593,17 @@ const PROCESS_INTERVAL = 33; // Process every 33ms (30 FPS) for smooth tracking
 
 let poseResultCount = 0;
 function onPoseResults(results) {
-    // Add safety checks before processing
-    const canvas = document.getElementById('canvas');
-    const video = document.getElementById('video');
-    
-    if (!canvas || !video) {
-        return; // Exit early if elements don't exist
-    }
-    
-    const ctx = canvas.getContext('2d');
-    if (!ctx) {
-        return; // Exit early if context fails
-    }
-    
     try {
-        // Remove throttling for real-time performance
-        // Every frame is now processed for smoother tracking
+        // Throttle processing to maintain stable performance
+        const now = Date.now();
+        if (now - lastProcessTime < PROCESS_INTERVAL) {
+            return;
+        }
+        lastProcessTime = now;
+        
+        const canvas = document.getElementById('canvas');
+        const ctx = canvas.getContext('2d');
+        const video = document.getElementById('video');
         
         // Set canvas size only once
         if (!state.canvasSizeSet && video.videoWidth) {
