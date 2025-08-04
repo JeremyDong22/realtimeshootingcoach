@@ -3,7 +3,7 @@
   "short_name": "Shoot It",
   "description": "AI驱动的篮球投篮训练助手",
   "start_url": "/",
-  "display": "standalone",
+  "display": "browser",
   "background_color": "#FAFAFA",
   "theme_color": "#000000",
   "orientation": "portrait",

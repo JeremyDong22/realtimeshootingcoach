@@ -46,7 +46,7 @@ class PWAInstaller {
         <div class="arrow-up"></div>
         <h3>请在浏览器中打开</h3>
         <p>点击右上角 ⋯ 菜单</p>
-        <p>选择 <strong>在Safari中打开</strong></p>
+        <p>选择 <strong>在浏览器中打开</strong></p>
         <button onclick="document.querySelector('.wechat-prompt').remove()">我知道了</button>
       </div>
     `;

@@ -33,7 +33,7 @@ class PWAUtils {
             return {
                 type: 'iOS',
                 version: version,
-                isProblematic: this.isStandalone // iOS PWAs have camera issues
+                isProblematic: false // Camera works in browser mode
             };
         }
         
@@ -111,10 +111,7 @@ class PWAUtils {
         // Platform-specific checks
         let platformSupport = true;
         
-        if (this.platform.type === 'iOS' && this.isStandalone) {
-            // iOS PWAs have known issues with camera access
-            platformSupport = false;
-        } else if (this.platform.type === 'Android' && this.platform.version >= 11 && this.isStandalone) {
+        if (this.platform.type === 'Android' && this.platform.version >= 11 && this.isStandalone) {
             // Android 11+ PWAs may have freezing issues but can still access camera
             platformSupport = 'partial'; // Camera works but may freeze
         }
@@ -133,18 +130,7 @@ class PWAUtils {
 
     // Get platform-specific camera recommendations
     getCameraRecommendation() {
-        if (this.platform.type === 'iOS' && this.isStandalone) {
-            return {
-                issue: 'iOS_PWA_CAMERA_BLOCKED',
-                message: 'Camera access is blocked in iOS PWA. Please use Safari browser instead.',
-                solution: 'OPEN_IN_BROWSER',
-                instructions: [
-                    'Tap the share button',
-                    'Select "Open in Safari"',
-                    'Use the camera in browser mode'
-                ]
-            };
-        } else if (this.platform.type === 'Android' && this.platform.version >= 11 && this.isStandalone) {
+        if (this.platform.type === 'Android' && this.platform.version >= 11 && this.isStandalone) {
             return {
                 issue: 'ANDROID_PWA_FREEZE',
                 message: 'Camera may freeze on Android. If it happens, minimize and restore the app.',
@@ -175,16 +161,9 @@ class PWAUtils {
         };
     }
 
-    // Open current page in browser (for iOS PWA users)
+    // Open current page in browser
     openInBrowser() {
-        if (this.platform.type === 'iOS') {
-            // iOS doesn't allow programmatic opening in Safari from PWA
-            // Show instructions instead
-            return {
-                success: false,
-                message: 'Please manually open in Safari using the share button'
-            };
-        } else if (this.platform.type === 'Android') {
+        if (this.platform.type === 'Android') {
             // Try to open in default browser
             window.open(window.location.href, '_blank');
             return {

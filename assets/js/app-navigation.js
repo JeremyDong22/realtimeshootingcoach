@@ -1258,22 +1258,7 @@ async function initializeMediaPipe() {
             if (cameraError.message && cameraError.message.includes('PLATFORM_ISSUE:')) {
                 const issue = cameraError.message.split(':')[1];
                 
-                if (issue === 'iOS_PWA_CAMERA_BLOCKED') {
-                    // iOS PWA camera blocked
-                    document.getElementById('trainingStatus').textContent = getCurrentLanguage() === 'zh' ? 
-                        'iOS应用模式无法访问摄像头' : 'Camera blocked in iOS app mode';
-                    
-                    // Show detailed instructions with button to open in browser
-                    const message = getCurrentLanguage() === 'zh' ? 
-                        'iOS限制：安装的应用无法使用摄像头\n\n解决方法：\n1. 点击分享按钮\n2. 选择"在Safari中打开"\n3. 在浏览器中使用摄像头功能' :
-                        'iOS Limitation: Installed apps cannot access camera\n\nSolution:\n1. Tap the share button\n2. Select "Open in Safari"\n3. Use camera in browser mode';
-                    
-                    alert(message);
-                    
-                    // Add button to help users
-                    showCameraAlternatives('ios_pwa');
-                    return;
-                } else if (issue === 'ANDROID_PWA_FREEZE') {
+                if (issue === 'ANDROID_PWA_FREEZE') {
                     // Android PWA may freeze - provide guidance
                     document.getElementById('trainingStatus').textContent = getCurrentLanguage() === 'zh' ? 
                         '提示：如摄像头冻结，请最小化并恢复应用' : 'Tip: If camera freezes, minimize and restore app';
@@ -3743,21 +3728,9 @@ function showCameraAlternatives(issueType) {
             </h3>
             <p style="margin-bottom: 20px; color: #666; font-size: 14px;">
                 ${getCurrentLanguage() === 'zh' ? 
-                    'iOS应用模式不支持摄像头。请选择以下选项：' : 
-                    'iOS app mode doesn\'t support camera. Please choose:'}
+                    '摄像头访问出现问题，请选择其他选项：' : 
+                    'Camera access issue. Please choose another option:'}
             </p>
-            <button onclick="window.open(window.location.href, '_blank')" 
-                    style="width: 100%; padding: 12px; margin-bottom: 10px; 
-                           background: #007AFF; color: white; border: none; 
-                           border-radius: 8px; font-size: 16px; cursor: pointer;">
-                ${getCurrentLanguage() === 'zh' ? '在Safari中打开' : 'Open in Safari'}
-            </button>
-            <button onclick="showManualInstructions()" 
-                    style="width: 100%; padding: 12px; margin-bottom: 10px; 
-                           background: #34C759; color: white; border: none; 
-                           border-radius: 8px; font-size: 16px; cursor: pointer;">
-                ${getCurrentLanguage() === 'zh' ? '查看详细说明' : 'View Instructions'}
-            </button>
             <button onclick="useFallbackCamera()" 
                     style="width: 100%; padding: 12px; margin-bottom: 10px; 
                            background: #FF9500; color: white; border: none; 
@@ -3780,11 +3753,7 @@ function showCameraPermissionGuide() {
     const platform = pwaUtils.platform.type;
     let instructions = '';
     
-    if (platform === 'iOS') {
-        instructions = getCurrentLanguage() === 'zh' ? 
-            '设置步骤：\n1. 打开设置\n2. 找到Safari浏览器\n3. 进入"网站设置"\n4. 允许摄像头访问' :
-            'Setup steps:\n1. Open Settings\n2. Find Safari\n3. Go to "Website Settings"\n4. Allow camera access';
-    } else if (platform === 'Android') {
+    if (platform === 'Android') {
         instructions = getCurrentLanguage() === 'zh' ? 
             '设置步骤：\n1. 点击地址栏左侧的锁图标\n2. 选择"网站设置"\n3. 允许摄像头权限\n4. 刷新页面' :
             'Setup steps:\n1. Tap the lock icon in address bar\n2. Select "Site settings"\n3. Allow camera permission\n4. Refresh the page';
@@ -3799,18 +3768,14 @@ function showCameraPermissionGuide() {
 
 function showManualInstructions() {
     const instructions = getCurrentLanguage() === 'zh' ? 
-        'iOS手动操作说明：\n\n' +
-        '1. 点击底部分享按钮（方框带箭头图标）\n' +
-        '2. 在分享菜单中选择"在Safari中打开"\n' +
-        '3. 等待页面在Safari中加载\n' +
-        '4. 点击"开始训练"使用摄像头\n\n' +
-        '注意：这是iOS系统限制，非应用问题' :
-        'iOS Manual Instructions:\n\n' +
-        '1. Tap the share button at bottom (box with arrow)\n' +
-        '2. Select "Open in Safari" from the menu\n' +
-        '3. Wait for page to load in Safari\n' +
-        '4. Tap "Start Training" to use camera\n\n' +
-        'Note: This is an iOS system limitation';
+        '摄像头使用说明：\n\n' +
+        '1. 确保已授予摄像头权限\n' +
+        '2. 刷新页面重试\n' +
+        '3. 或使用文件上传功能' :
+        'Camera Instructions:\n\n' +
+        '1. Ensure camera permission is granted\n' +
+        '2. Refresh the page to retry\n' +
+        '3. Or use file upload feature';
     
     alert(instructions);
 }
