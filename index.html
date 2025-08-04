@@ -701,13 +701,48 @@
     <!-- Service Worker Registration -->
     <script>
         if ('serviceWorker' in navigator) {
-            window.addEventListener('load', () => {
-                // Add timestamp to force service worker update
-                navigator.serviceWorker.register('/service-worker.js?v=7.0')
+            window.addEventListener('load', async () => {
+                // First, unregister all old service workers
+                const registrations = await navigator.serviceWorker.getRegistrations();
+                for(let registration of registrations) {
+                    console.log('Unregistering old service worker:', registration.scope);
+                    await registration.unregister();
+                }
+                
+                // Clear all caches
+                if ('caches' in window) {
+                    const cacheNames = await caches.keys();
+                    await Promise.all(
+                        cacheNames.map(cacheName => {
+                            console.log('Deleting cache:', cacheName);
+                            return caches.delete(cacheName);
+                        })
+                    );
+                }
+                
+                // Now register the new service worker with timestamp
+                const timestamp = Date.now();
+                navigator.serviceWorker.register(`/service-worker.js?t=${timestamp}`)
                     .then(registration => {
-                        console.log('ServiceWorker registration successful:', registration.scope);
-                        // Force update check
+                        console.log('ServiceWorker v7 registration successful:', registration.scope);
+                        // Force immediate update
                         registration.update();
+                        
+                        // If there's a waiting worker, skip waiting
+                        if (registration.waiting) {
+                            registration.waiting.postMessage({ type: 'SKIP_WAITING' });
+                        }
+                        
+                        // Listen for updates
+                        registration.addEventListener('updatefound', () => {
+                            const newWorker = registration.installing;
+                            newWorker.addEventListener('statechange', () => {
+                                if (newWorker.state === 'activated') {
+                                    console.log('New service worker activated, reloading page...');
+                                    window.location.reload();
+                                }
+                            });
+                        });
                     })
                     .catch(err => console.log('ServiceWorker registration failed:', err));
             });
