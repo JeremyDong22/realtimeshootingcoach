@@ -76,12 +76,5 @@
         }
       ]
     }
-  ],
-  "redirects": [
-    {
-      "source": "http://:domain/(.*)",
-      "destination": "https://:domain/$1",
-      "permanent": true
-    }
   ]
 }
