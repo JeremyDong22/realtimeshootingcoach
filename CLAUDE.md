@@ -146,3 +146,10 @@ The ONNX model (`basketballModel.onnx`) must be present in the root directory fo
 
 - **Debugging and Experimentation**:
   - We use the app-debug.js to debug and also use for experimenting with our new feature.
+
+## Project Folder Insights
+
+- **Experiment Folder**:
+  - This is the place where we do the experiment and develop new features
+  - More focused on the algorithm of kinesiology and biomechanics
+  - The JavaScript file within it is usually referred to as the blueprint or the test for the actual app in @shot-detection.js

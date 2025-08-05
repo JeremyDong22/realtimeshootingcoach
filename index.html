@@ -221,7 +221,7 @@
                 <h3 class="setup-section-title" data-i18n="chooseTrainingMode">选择训练模式</h3>
                 
                 <div class="training-modes">
-                    <div class="training-mode-card" onclick="selectTrainingMode('shots')">
+                    <div class="training-mode-card" onclick="selectTrainingMode('shots', event)">
                         <div class="mode-icon">
                             <svg viewBox="0 0 24 24" fill="currentColor">
                                 <circle cx="12" cy="12" r="9" stroke="currentColor" stroke-width="2" fill="none"/>
@@ -236,7 +236,7 @@
                         </div>
                     </div>
                     
-                    <div class="training-mode-card" onclick="selectTrainingMode('time')">
+                    <div class="training-mode-card" onclick="selectTrainingMode('time', event)">
                         <div class="mode-icon">
                             <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5">
                                 <circle cx="12" cy="12" r="10"/>
@@ -256,7 +256,7 @@
                         </div>
                     </div>
                     
-                    <div class="training-mode-card" onclick="selectTrainingMode('free')">
+                    <div class="training-mode-card" onclick="selectTrainingMode('free', event)">
                         <div class="mode-icon">
                             <svg viewBox="0 0 24 24" fill="currentColor">
                                 <path d="M19 12c0-2.5-1-4.5-2.5-6s-2-3-2-3-1.5 1.5-3 3S9 9.5 9 12c0 1.5.5 3 1.5 4S13 18 14 18s2.5-.5 3.5-1.5S19 13.5 19 12z"/>
@@ -268,7 +268,7 @@
                 </div>
                 
                 <div class="training-presets">
-                    <h3 class="setup-section-title"><span data-i18n="proMode">专业模式</span> <span style="font-size: var(--font-sm); color: var(--text-tertiary); font-weight: normal;" data-i18n="waitingDevelopment">(待开发)</span></h3>
+                    <h3 class="setup-section-title" data-i18n="proMode">专业模式</h3>
                     <div class="preset-cards">
                         <div class="preset-card" onclick="applyPreset('stability')">
                             <div class="preset-icon">🎯</div>
@@ -278,7 +278,7 @@
                             </div>
                         </div>
                         
-                        <div class="preset-card" onclick="applyPreset('speed')">
+                        <div class="preset-card disabled" onclick="applyPreset('speed')">
                             <div class="preset-icon">⚡</div>
                             <div class="preset-info">
                                 <h5 class="preset-title" data-i18n="releaseSpeed">出手速度训练</h5>
@@ -286,7 +286,7 @@
                             </div>
                         </div>
                         
-                        <div class="preset-card" onclick="applyPreset('efficiency')">
+                        <div class="preset-card disabled" onclick="applyPreset('efficiency')">
                             <div class="preset-icon">💪</div>
                             <div class="preset-info">
                                 <h5 class="preset-title" data-i18n="powerEfficiency">发力效率训练</h5>
@@ -354,6 +354,22 @@
                     </div>
                     <div class="target-reminder" id="targetReminder">
                         <!-- Target info will be inserted here -->
+                    </div>
+                </div>
+                
+                <!-- Stability Training Instructions (shown conditionally) -->
+                <div id="stabilityInstructions" style="display: none;">
+                    <div class="stability-tips">
+                        <h4 data-i18n="stabilityTips">稳定性训练要点</h4>
+                        <ul class="tips-list">
+                            <li data-i18n="stabilityTip1">• 尽可能保证投篮命中率</li>
+                            <li data-i18n="stabilityTip2">• 尽可能保持投篮动作稳定</li>
+                            <li data-i18n="stabilityTip3">• 重点关注重心的偏移和投篮前后的脚步落点</li>
+                            <li data-i18n="stabilityTip4">• 根据实时语音反馈进行调整</li>
+                        </ul>
+                        <div class="stability-note">
+                            <p data-i18n="stabilityNote">本模式利用投篮前后的脚步落点衡量稳定性表现</p>
+                        </div>
                     </div>
                 </div>
                 
@@ -677,6 +693,15 @@
                 <div class="modal-stats" id="modalStats" style="padding: var(--space-lg); background: var(--bg-secondary);"></div>
             </div>
         </div>
+
+        <!-- Analyzing Indicator -->
+        <div id="analyzingIndicator" class="analyzing-indicator">
+            <div class="analyzing-spinner"></div>
+            <span data-i18n="analyzing">分析中...</span>
+        </div>
+
+        <!-- Screen Flash -->
+        <div id="screenFlash" class="screen-flash"></div>
     </div>
 
     <!-- Supabase SDK -->

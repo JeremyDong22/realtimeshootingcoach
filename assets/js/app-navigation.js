@@ -13,10 +13,13 @@
 // - Fixed service worker cache paths to match actual file structure
 // - Enhanced camera handling for cross-platform PWA compatibility
 // - Added Android freeze recovery and iOS PWA detection
+// - Integrated modular shot-detection.js for professional training modes
+// - Added landmarks tracking to frameBuffer for post-processing analysis
 import { simpleAuth, simpleShots, getUserCount } from './simple-auth.js?v=7.1';
 import { supabase } from './supabase-client.js';
 import { t, setLanguage, getCurrentLanguage, updateUILanguage, speak, getSpeechCommand } from './i18n.js';
 import { pwaUtils } from './pwa-utils.js';
+import { ShotDetection, SHOT_DETECTION_CONFIG } from './shot-detection.js';
 
 // MediaPipe imports (from global scope)
 const { Pose, Camera, drawConnectors, drawLandmarks, POSE_CONNECTIONS } = window;
@@ -155,7 +158,9 @@ const state = {
         requiredJoints: ['ankle', 'knee', 'hip', 'shoulder', 'elbow', 'wrist'],
         bodyNotDetectedTime: null,
         lastBodyWarning: null
-    }
+    },
+    trainingMode: 'regular', // 'regular' or 'professional'
+    professionalPreset: null // 'stability', 'precision', 'rhythm' etc.
 };
 
 // Enhanced Camera Helper Class with cross-platform support
@@ -1628,29 +1633,21 @@ function onPoseResults(results) {
     if (results.poseLandmarks) {
         const isLeftHanded = state.shootingHand === 'left';
         
-        // Draw skeleton connections for shooting side
-        // Define connections based on shooting hand
+        // Draw skeleton connections for shooting side only
+        // Define connections based on shooting hand - no fingers, no opposite side
         const shootingSideConnections = isLeftHanded ? [
-            // Left side connections
+            // Left side connections only (no fingers)
             [11, 13], // left shoulder to left elbow
             [13, 15], // left elbow to left wrist
-            [15, 17], // left wrist to left pinky
-            [15, 19], // left wrist to left index
-            [15, 21], // left wrist to left thumb
-            [11, 23], // left shoulder to left hip
             [23, 25], // left hip to left knee
             [25, 27], // left knee to left ankle
             [27, 29], // left ankle to left heel
             [27, 31], // left ankle to left foot index
             [29, 31], // left heel to left foot index
         ] : [
-            // Right side connections
+            // Right side connections only (no fingers)
             [12, 14], // right shoulder to right elbow
             [14, 16], // right elbow to right wrist
-            [16, 18], // right wrist to right pinky
-            [16, 20], // right wrist to right index
-            [16, 22], // right wrist to right thumb
-            [12, 24], // right shoulder to right hip
             [24, 26], // right hip to right knee
             [26, 28], // right knee to right ankle
             [28, 30], // right ankle to right heel
@@ -1658,32 +1655,19 @@ function onPoseResults(results) {
             [30, 32], // right heel to right foot index
         ];
         
-        // Add torso connections
-        const torsoConnections = [
-            [11, 12], // shoulders
-            [23, 24], // hips
-            [11, 23], // left shoulder to left hip
-            [12, 24], // right shoulder to right hip
-        ];
-        
-        // Draw all connections with black lines
-        const allConnections = [...shootingSideConnections, ...torsoConnections];
-        drawConnectors(ctx, results.poseLandmarks, allConnections, {
+        // Draw only shooting side connections with black lines
+        drawConnectors(ctx, results.poseLandmarks, shootingSideConnections, {
             color: '#000000', // Black lines
             lineWidth: 2
         });
         
-        // Draw joints as small white circles (except wrist)
+        // Draw only specific joints (no fingers, no eyes, only shooting side)
         const shootingSideJoints = isLeftHanded ? 
-            [11, 13, 17, 19, 21, 23, 25, 27, 29, 31] : // Left side joints (excluding wrist 15)
-            [12, 14, 18, 20, 22, 24, 26, 28, 30, 32];  // Right side joints (excluding wrist 16)
-        
-        // Add torso joints
-        const torsoJoints = isLeftHanded ? [12, 24] : [11, 23]; // Opposite side shoulder and hip
-        const allJoints = [...shootingSideJoints, ...torsoJoints];
+            [11, 13, 23, 25, 27] : // Left side: shoulder, elbow, hip, knee, ankle (no wrist)
+            [12, 14, 24, 26, 28];  // Right side: shoulder, elbow, hip, knee, ankle (no wrist)
         
         // Draw white joint circles
-        allJoints.forEach(jointIndex => {
+        shootingSideJoints.forEach(jointIndex => {
             if (results.poseLandmarks[jointIndex]) {
                 drawLandmarks(ctx, [results.poseLandmarks[jointIndex]], {
                     color: '#FFFFFF', // White
@@ -1801,10 +1785,11 @@ function onPoseResults(results) {
             frameBuffer.shift();
         }
         
-        // Store frame data with timestamp for accurate playback
+        // Store frame data with timestamp and landmarks for post-processing
         frameBuffer.push({
             imageData: ctx.getImageData(0, 0, canvas.width, canvas.height),
-            time: currentTime
+            time: currentTime,
+            landmarks: results.poseLandmarks // Added for stability analysis
         });
     }
     
@@ -1813,9 +1798,9 @@ function onPoseResults(results) {
     }
 }
 
-// Shot detection constants
-const VELOCITY_THRESHOLD = 300; // degrees per second
-const MAX_ANALYSIS_HISTORY = 90; // 3 seconds at 30fps
+// Shot detection constants - now imported from shot-detection.js
+const VELOCITY_THRESHOLD = SHOT_DETECTION_CONFIG.VELOCITY_THRESHOLD;
+const MAX_ANALYSIS_HISTORY = SHOT_DETECTION_CONFIG.FRAME_BUFFER_SIZE;
 
 // Store longer wrist history for shot analysis (3 seconds)
 const wristAnalysisHistory = [];
@@ -1938,7 +1923,18 @@ function startCountdown() {
             setTimeout(() => {
                 countdownOverlay.classList.add('hidden');
                 state.shotDetection.isCountdownComplete = true;
-                document.getElementById('trainingStatus').textContent = 'Ready! Start shooting';
+                
+                // Set status text based on training mode
+                const statusEl = document.getElementById('trainingStatus');
+                const lang = getCurrentLanguage();
+                
+                if (state.trainingMode === 'professional' && state.professionalPreset === 'stability') {
+                    statusEl.innerHTML = lang === 'zh' ? 
+                        '<strong>投篮稳定性训练</strong><br><span style="font-size: 12px;">保持动作稳定，系统将实时反馈您的表现</span>' :
+                        '<strong>Stability Training</strong><br><span style="font-size: 12px;">Maintain form, real-time feedback on performance</span>';
+                } else {
+                    statusEl.textContent = lang === 'zh' ? '准备就绪！开始投篮' : 'Ready! Start shooting';
+                }
                 
                 // Start recording and debug panel
                 startRecording();
@@ -2101,7 +2097,8 @@ function detectShot(landmarks) {
                 wristAboveNose &&
                 recentAngleInRange &&
                 isForwardMotion &&
-                angularVelocity > VELOCITY_THRESHOLD) {
+                angularVelocity > VELOCITY_THRESHOLD &&
+                !state.pendingShotData) {  // Prevent duplicate detections
                 
                 // Debug state display removed for performance
                 
@@ -2120,18 +2117,42 @@ function detectShot(landmarks) {
                         uShapeFound: shotStart.uShapeFound
                     };
                     
-                    // Wait 300ms to capture post-release frames like debug version
-                    setTimeout(() => {
-                        console.log('Saving shot video after 300ms delay to capture follow-through');
-                        saveShotData(shotDataToSave);
-                    }, 300);
+                    // Store reference for delayed processing
+                    state.pendingShotData = shotDataToSave;
                     
-                    // Show feedback
+                    // Wait 700ms to capture post-release frames and ensure complete data
+                    setTimeout(async () => {
+                        console.log('Saving shot video after 700ms delay to capture follow-through and landing');
+                        
+                        // Show analyzing indicator for professional mode
+                        if (state.trainingMode === 'professional') {
+                            const indicator = document.getElementById('analyzingIndicator');
+                            indicator.classList.add('show');
+                        }
+                        
+                        const savedData = await saveShotData(shotDataToSave);
+                        
+                        // Hide analyzing indicator
+                        if (state.trainingMode === 'professional') {
+                            const indicator = document.getElementById('analyzingIndicator');
+                            indicator.classList.remove('show');
+                        }
+                        
+                        // Clear pending shot data after processing
+                        state.pendingShotData = null;
+                        
+                        // Show feedback with stability metrics if available
+                        if (savedData && savedData.stabilityMetrics) {
+                            showShotFeedback(shotDuration, angularVelocity, savedData.stabilityMetrics, true);  // Skip counter update
+                        }
+                    }, SHOT_DETECTION_CONFIG.SHOT_PADDING);
+                    
+                    // Show immediate feedback
                     showShotFeedback(shotDuration, angularVelocity);
                 }
                 
                 // Set cooldown - reduced for faster detection
-                shotCooldown = 30; // 1 second at 30fps
+                shotCooldown = SHOT_DETECTION_CONFIG.COOLDOWN_FRAMES;
             }
         }
     } else {
@@ -2149,13 +2170,17 @@ function detectShot(landmarks) {
 
 
 // Show Shot Feedback
-function showShotFeedback(duration, velocity) {
-    // Play shot detection sound
-    audioManager.playShotSound();
+function showShotFeedback(duration, velocity, stabilityMetrics = null, skipCounterUpdate = false) {
+    // Play shot detection sound only on first call
+    if (!skipCounterUpdate) {
+        audioManager.playShotSound();
+    }
     
-    // Update session counter
-    state.sessionShots++;
-    document.getElementById('sessionShots').textContent = state.sessionShots;
+    // Update session counter only if not skipping
+    if (!skipCounterUpdate) {
+        state.sessionShots++;
+        document.getElementById('sessionShots').textContent = state.sessionShots;
+    }
     
     // Check if target shots reached
     if (state.trainingSettings.mode === 'shots' && 
@@ -2184,13 +2209,97 @@ function showShotFeedback(duration, velocity) {
     setTimeout(() => {
         document.body.classList.remove('haptic');
     }, 100);
+    
+    // Show stability feedback if available
+    if (stabilityMetrics && state.trainingMode === 'professional') {
+        showStabilityFeedback(stabilityMetrics);
+    }
+}
+
+// Voice feedback system
+function speakFeedback(text, lang = null) {
+    // Use current language if not specified
+    if (!lang) {
+        lang = getCurrentLanguage() === 'zh' ? 'zh-CN' : 'en-US';
+    }
+    
+    const utterance = new SpeechSynthesisUtterance(text);
+    utterance.lang = lang;
+    utterance.rate = 1.1; // Slightly faster
+    utterance.pitch = 1.0;
+    utterance.volume = 0.9;
+    
+    // Cancel any ongoing speech
+    speechSynthesis.cancel();
+    speechSynthesis.speak(utterance);
+}
+
+// Get stability level feedback text
+function getStabilityFeedbackText(percentage, lang) {
+    if (percentage <= 10) {
+        return lang === 'zh' ? "优秀的稳定性" : "Excellent stability";
+    } else if (percentage <= 20) {
+        return lang === 'zh' ? "良好的稳定性" : "Good stability";
+    } else if (percentage <= 30) {
+        return lang === 'zh' ? "一般的稳定性" : "Average stability";
+    } else if (percentage <= 40) {
+        return lang === 'zh' ? "较差的稳定性" : "Poor stability";
+    } else {
+        return lang === 'zh' ? "很差的稳定性" : "Very poor stability";
+    }
+}
+
+// Show stability training feedback
+function showStabilityFeedback(metrics) {
+    const statusEl = document.getElementById('trainingStatus');
+    const lang = getCurrentLanguage();
+    
+    if (metrics.toe) {
+        const percentage = parseFloat(metrics.toe.percentage);
+        
+        // Provide voice feedback
+        const voiceFeedback = getStabilityFeedbackText(percentage, lang);
+        speakFeedback(voiceFeedback);
+        
+        // Show screen flash based on stability level
+        const flashEl = document.getElementById('screenFlash');
+        let flashClass = '';
+        
+        if (percentage <= 10) {
+            flashClass = 'excellent';
+        } else if (percentage <= 20) {
+            flashClass = 'good';
+        } else if (percentage <= 30) {
+            flashClass = 'average';
+        } else if (percentage <= 40) {
+            flashClass = 'poor';
+        } else {
+            flashClass = 'very-poor';
+        }
+        
+        // Trigger flash animation
+        flashEl.className = `screen-flash ${flashClass}`;
+        // Force reflow to restart animation
+        void flashEl.offsetWidth;
+        
+        // Clear flash after animation completes
+        setTimeout(() => {
+            flashEl.className = 'screen-flash';
+        }, 500);
+        
+        // Update status with score
+        const feedback = lang === 'zh' ? 
+            `稳定性得分: ${metrics.overall.score}/100` :
+            `Stability Score: ${metrics.overall.score}/100`;
+        statusEl.textContent = feedback;
+    }
 }
 
 // Generate video clip from frameBuffer
 async function generateVideoFromFrames(startTime, endTime) {
-    // Add 300ms padding to match debug version
-    const paddedStartTime = startTime - 300;
-    const paddedEndTime = endTime + 300;
+    // Add padding to capture complete shot motion
+    const paddedStartTime = startTime - SHOT_DETECTION_CONFIG.VIDEO_PADDING.before;
+    const paddedEndTime = endTime + SHOT_DETECTION_CONFIG.VIDEO_PADDING.after;
     
     // Filter frames within the padded period
     const shotFrames = frameBuffer.filter(frame => 
@@ -2297,6 +2406,29 @@ async function saveShotData(shotData) {
             return;
         }
         
+        // Perform stability analysis if in professional mode
+        let stabilityMetrics = null;
+        if (state.trainingMode === 'professional' && state.professionalPreset === 'stability') {
+            // Extract frames with landmarks for analysis
+            const analysisFrames = frameBuffer.filter(frame => 
+                frame.time >= shotData.startTime - SHOT_DETECTION_CONFIG.VIDEO_PADDING.before &&
+                frame.time <= shotData.releaseTime + SHOT_DETECTION_CONFIG.VIDEO_PADDING.after &&
+                frame.landmarks
+            ).map(frame => {
+                const trackingResult = ShotDetection.trackFrame(frame.landmarks, state.shootingHand === 'left');
+                return {
+                    timestamp: frame.time,
+                    trackers: trackingResult.trackers  // Extract just the trackers object
+                };
+            });
+            
+            if (analysisFrames.length > 0) {
+                // Pass release time for proper U-shape detection
+                stabilityMetrics = await ShotDetection.analyzeStability(analysisFrames, shotData.releaseTime);
+                console.log('Stability analysis:', stabilityMetrics);
+            }
+        }
+        
         // Calculate actual shot speed (duration between start and release)
         let shotSpeed = null;
         if (shotData.uShapeFound || shotData.duration < 3) {
@@ -2307,6 +2439,8 @@ async function saveShotData(shotData) {
         
         // Enhanced shot data
         const enhancedShotData = {
+            ...shotData,
+            stabilityMetrics,
             ...shotData,
             shotSpeed, // null if we couldn't detect start point
             needsAdjustment: !shotData.uShapeFound && shotData.duration >= 3,
@@ -2326,7 +2460,10 @@ async function saveShotData(shotData) {
                 blob: videoBlob,
                 sessionId: state.sessionId,
                 userId: state.user.id,
-                shotData: enhancedShotData
+                shotData: enhancedShotData,
+                // Add training mode information
+                trainingMode: state.trainingSettings.mode, // 'shots', 'time', 'free'
+                professionalMode: state.trainingMode === 'professional' ? state.professionalPreset : null
             };
             
             const transaction = db.transaction([STORE_NAME], 'readwrite');
@@ -2334,6 +2471,7 @@ async function saveShotData(shotData) {
             const request = store.add(videoData);
             
             request.onsuccess = () => {
+                console.log('Shot saved with stability metrics:', enhancedShotData.stabilityMetrics);
             };
             
             request.onerror = () => {
@@ -2342,8 +2480,12 @@ async function saveShotData(shotData) {
         } catch (error) {
             console.error(' Error saving to IndexedDB:', error);
         }
+        
+        // Return the enhanced shot data for UI feedback
+        return enhancedShotData;
     } catch (err) {
         console.error('Error in saveShotData:', err);
+        return null;
     }
 }
 
@@ -2401,6 +2543,9 @@ function stopTraining() {
     // Delay navigation to allow cleanup to complete
     setTimeout(() => {
         navigateTo('replays');
+        // Reset professional mode
+        state.trainingMode = 'regular';
+        state.professionalPreset = null;
     }, 100);
 }
 
@@ -2611,20 +2756,66 @@ async function playReplay(shotId) {
             const dateStr = shotDate.toLocaleDateString();
             const timeStr = shotDate.toLocaleTimeString();
             
-            stats.innerHTML = `
-                <div style="display: flex; justify-content: center; align-items: stretch; text-align: center; padding: var(--space-lg); gap: var(--space-lg);">
-                    <div style="flex: 1; display: flex; flex-direction: column; align-items: center;">
-                        <div style="font-size: var(--font-base); font-weight: 600; color: var(--text-primary);">${dateStr}</div>
-                        <div style="font-size: var(--font-sm); color: var(--text-secondary); margin-top: 4px;">${timeStr}</div>
-                        <div style="color: var(--text-tertiary); margin-top: var(--space-xs); font-size: var(--font-xs); text-transform: uppercase; letter-spacing: 0.05em; white-space: nowrap;">${t('dateAndTime')}</div>
-                    </div>
+            // Check if this is a professional mode shot with stability metrics
+            const hasStabilityMetrics = videoData.professionalMode === 'stability' && videoData.shotData?.stabilityMetrics?.toe;
+            let stabilitySection = '';
+            
+            if (hasStabilityMetrics) {
+                const percentage = videoData.shotData.stabilityMetrics.toe.percentage;
+                const color = videoData.shotData.stabilityMetrics.toe.color;
+                
+                // Get stability level text (not percentage)
+                let levelText;
+                if (percentage <= 10) {
+                    levelText = getCurrentLanguage() === 'zh' ? '优秀' : 'Excellent';
+                } else if (percentage <= 20) {
+                    levelText = getCurrentLanguage() === 'zh' ? '良好' : 'Good';
+                } else if (percentage <= 30) {
+                    levelText = getCurrentLanguage() === 'zh' ? '一般' : 'Average';
+                } else if (percentage <= 40) {
+                    levelText = getCurrentLanguage() === 'zh' ? '较差' : 'Poor';
+                } else {
+                    levelText = getCurrentLanguage() === 'zh' ? '很差' : 'Very Poor';
+                }
+                
+                stabilitySection = `
                     <div style="width: 1px; background: var(--bg-tertiary); align-self: stretch;"></div>
                     <div style="flex: 1; display: flex; flex-direction: column; align-items: center;">
-                        <div style="font-size: var(--font-xl); font-weight: 700; color: var(--accent-primary);">${Math.round((videoData.duration || 0) * 1000)}ms</div>
-                        <div style="color: var(--text-tertiary); margin-top: var(--space-xs); font-size: var(--font-xs); text-transform: uppercase; letter-spacing: 0.05em; white-space: nowrap;">${t('duration')}</div>
+                        <div style="font-size: var(--font-xl); font-weight: 700; color: ${color};">${levelText}</div>
+                        <div style="color: var(--text-tertiary); margin-top: var(--space-xs); font-size: var(--font-xs); text-transform: uppercase; letter-spacing: 0.05em; white-space: nowrap;">${getCurrentLanguage() === 'zh' ? '稳定性' : 'Stability'}</div>
                     </div>
-                </div>
-            `;
+                `;
+            }
+            
+            // Show only relevant stats based on mode
+            if (hasStabilityMetrics) {
+                // Professional mode: show shot speed and stability
+                stats.innerHTML = `
+                    <div style="display: flex; justify-content: center; align-items: stretch; text-align: center; padding: var(--space-lg); gap: var(--space-lg);">
+                        <div style="flex: 1; display: flex; flex-direction: column; align-items: center;">
+                            <div style="font-size: var(--font-xl); font-weight: 700; color: var(--accent-primary);">${((videoData.duration || 0)).toFixed(2)}s</div>
+                            <div style="color: var(--text-tertiary); margin-top: var(--space-xs); font-size: var(--font-xs); text-transform: uppercase; letter-spacing: 0.05em; white-space: nowrap;">${t('shotSpeed')}</div>
+                        </div>
+                        ${stabilitySection}
+                    </div>
+                `;
+            } else {
+                // Regular mode: show date/time and shot speed
+                stats.innerHTML = `
+                    <div style="display: flex; justify-content: center; align-items: stretch; text-align: center; padding: var(--space-lg); gap: var(--space-lg);">
+                        <div style="flex: 1; display: flex; flex-direction: column; align-items: center;">
+                            <div style="font-size: var(--font-base); font-weight: 600; color: var(--text-primary);">${dateStr}</div>
+                            <div style="font-size: var(--font-sm); color: var(--text-secondary); margin-top: 4px;">${timeStr}</div>
+                            <div style="color: var(--text-tertiary); margin-top: var(--space-xs); font-size: var(--font-xs); text-transform: uppercase; letter-spacing: 0.05em; white-space: nowrap;">${t('dateAndTime')}</div>
+                        </div>
+                        <div style="width: 1px; background: var(--bg-tertiary); align-self: stretch;"></div>
+                        <div style="flex: 1; display: flex; flex-direction: column; align-items: center;">
+                            <div style="font-size: var(--font-xl); font-weight: 700; color: var(--accent-primary);">${((videoData.duration || 0)).toFixed(2)}s</div>
+                            <div style="color: var(--text-tertiary); margin-top: var(--space-xs); font-size: var(--font-xs); text-transform: uppercase; letter-spacing: 0.05em; white-space: nowrap;">${t('shotSpeed')}</div>
+                        </div>
+                    </div>
+                `;
+            }
             
             modal.classList.add('show');
             video.play();
@@ -2740,7 +2931,7 @@ function shareApp() {
 }
 
 // Training Setup Functions
-function selectTrainingMode(mode) {
+function selectTrainingMode(mode, event) {
     // Clear previous selections
     document.querySelectorAll('.training-mode-card').forEach(card => {
         card.classList.remove('active');
@@ -2751,8 +2942,19 @@ function selectTrainingMode(mode) {
     
     // Set new selection
     state.trainingSettings.mode = mode;
-    const selectedCard = event.currentTarget;
-    selectedCard.classList.add('active');
+    
+    // Find and activate the selected card
+    let selectedCard;
+    if (event && event.currentTarget) {
+        selectedCard = event.currentTarget;
+    } else {
+        // When called programmatically, find the card by mode
+        selectedCard = document.querySelector(`[onclick*="selectTrainingMode('${mode}')"]`);
+    }
+    
+    if (selectedCard) {
+        selectedCard.classList.add('active');
+    }
     
     // Show input for specific modes
     if (mode === 'shots') {
@@ -2794,25 +2996,48 @@ function startTrainingWithSettings() {
         }
         
         // Update mode reminder
-        const modeText = state.trainingSettings.mode === 'shots' ? 'Shot Count' : 
-                         state.trainingSettings.mode === 'time' ? 'Time Trial' : 'Free Practice';
-        document.getElementById('modeReminder').textContent = modeText;
+        let modeText;
+        let targetText;
+        const lang = getCurrentLanguage();
         
-        // Update target reminder
-        const targetEl = document.getElementById('targetReminder');
-        if (state.trainingSettings.mode === 'shots') {
-            targetEl.textContent = `Target: ${state.trainingSettings.targetShots} shots`;
-        } else if (state.trainingSettings.mode === 'time') {
-            const minutes = Math.floor(state.trainingSettings.targetTime / 60);
-            const seconds = state.trainingSettings.targetTime % 60;
-            targetEl.textContent = `Duration: ${minutes}:${seconds.toString().padStart(2, '0')}`;
+        if (state.trainingMode === 'professional' && state.professionalPreset === 'stability') {
+            modeText = lang === 'zh' ? '投篮稳定性训练' : 'Shooting Stability Training';
+            targetText = lang === 'zh' ? 
+                '请尽可能保持投篮动作稳定，重点关注重心偏移和脚步落点。系统将实时反馈您的稳定性表现。' :
+                'Maintain consistent form throughout your shot. Focus on center of gravity and foot placement. Real-time feedback on stability performance.';
         } else {
-            targetEl.textContent = 'No limits - practice freely';
+            modeText = state.trainingSettings.mode === 'shots' ? (lang === 'zh' ? '投篮计数' : 'Shot Count') : 
+                      state.trainingSettings.mode === 'time' ? (lang === 'zh' ? '计时挑战' : 'Time Trial') : 
+                      (lang === 'zh' ? '自由练习' : 'Free Practice');
+                      
+            if (state.trainingSettings.mode === 'shots') {
+                targetText = lang === 'zh' ? `目标: ${state.trainingSettings.targetShots} 次投篮` : `Target: ${state.trainingSettings.targetShots} shots`;
+            } else if (state.trainingSettings.mode === 'time') {
+                const minutes = Math.floor(state.trainingSettings.targetTime / 60);
+                const seconds = state.trainingSettings.targetTime % 60;
+                targetText = lang === 'zh' ? `时长: ${minutes}:${seconds.toString().padStart(2, '0')}` : `Duration: ${minutes}:${seconds.toString().padStart(2, '0')}`;
+            } else {
+                targetText = lang === 'zh' ? '无限制 - 自由练习' : 'No limits - practice freely';
+            }
         }
+        
+        document.getElementById('modeReminder').textContent = modeText;
+        document.getElementById('targetReminder').innerHTML = targetText;
         
         // Navigate to instructions page after updating content
         setTimeout(() => {
             navigateTo('trainingInstructions');
+            
+            // Show stability instructions if in stability training mode
+            const stabilityInstructions = document.getElementById('stabilityInstructions');
+            if (stabilityInstructions) {
+                if (state.professionalPreset === 'stability') {
+                    stabilityInstructions.style.display = 'block';
+                } else {
+                    stabilityInstructions.style.display = 'none';
+                }
+            }
+            
             // Re-enable button after navigation
             if (btn) {
                 btn.disabled = false;
@@ -2822,6 +3047,58 @@ function startTrainingWithSettings() {
     });
 }
 
+
+// Get training mode info for display
+function getTrainingModeInfo(mode, professionalMode) {
+    const lang = getCurrentLanguage();
+    
+    // Professional modes - Purple color scheme
+    if (professionalMode === 'stability') {
+        return {
+            icon: `<svg viewBox="0 0 24 24" fill="currentColor" class="mode-icon">
+                <path d="M12 2a9 9 0 0 0-9 9c0 4 3 7 3 7h12s3-3 3-7a9 9 0 0 0-9-9z"/>
+                <circle cx="12" cy="11" r="3"/>
+                <path d="M12 14v7"/>
+            </svg>`,
+            name: lang === 'zh' ? '稳定性训练' : 'Stability Training',
+            color: '#8B5CF6' // Purple for professional
+        };
+    }
+    
+    // Regular modes - Orange color scheme
+    const orangeColor = '#F97316'; // Unified orange for all regular modes
+    
+    switch (mode) {
+        case 'shots':
+            return {
+                icon: `<svg viewBox="0 0 24 24" fill="currentColor" class="mode-icon">
+                    <circle cx="12" cy="12" r="9" stroke="currentColor" stroke-width="2" fill="none"/>
+                    <path d="M12 3C12 3 12 21 12 21" stroke="currentColor" stroke-width="2"/>
+                    <path d="M3 12C3 12 21 12 21 12" stroke="currentColor" stroke-width="2"/>
+                </svg>`,
+                name: lang === 'zh' ? '投篮计数' : 'Shot Count',
+                color: orangeColor
+            };
+        case 'time':
+            return {
+                icon: `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" class="mode-icon">
+                    <circle cx="12" cy="12" r="10"/>
+                    <polyline points="12 6 12 12 16 14"/>
+                </svg>`,
+                name: lang === 'zh' ? '计时挑战' : 'Time Trial',
+                color: orangeColor
+            };
+        case 'free':
+        default:
+            return {
+                icon: `<svg viewBox="0 0 24 24" fill="currentColor" class="mode-icon">
+                    <path d="M19 12c0-2.5-1-4.5-2.5-6s-2-3-2-3-1.5 1.5-3 3S9 9.5 9 12c0 1.5.5 3 1.5 4S13 18 14 18s2.5-.5 3.5-1.5S19 13.5 19 12z"/>
+                </svg>`,
+                name: lang === 'zh' ? '自由练习' : 'Free Practice',
+                color: orangeColor
+            };
+    }
+}
 
 // Load Sessions (from IndexedDB)
 async function loadSessions() {
@@ -2853,24 +3130,53 @@ async function loadSessions() {
                 const totalDuration = session.shots.reduce((sum, shot) => sum + (shot.shotData?.duration || 0), 0);
                 const avgDuration = totalDuration / session.shots.length;
                 
+                // Get mode info from the first shot in the session
+                const firstShot = session.shots[0];
+                const modeInfo = getTrainingModeInfo(
+                    firstShot.trainingMode || 'free',
+                    firstShot.professionalMode
+                );
+                
+                // Calculate average stability score for professional mode
+                let avgStabilityScore = null;
+                if (firstShot.professionalMode) {
+                    const stabilityScores = session.shots
+                        .filter(shot => shot.shotData?.stabilityMetrics?.overall?.score !== undefined)
+                        .map(shot => shot.shotData.stabilityMetrics.overall.score);
+                    
+                    if (stabilityScores.length > 0) {
+                        avgStabilityScore = Math.round(
+                            stabilityScores.reduce((sum, score) => sum + score, 0) / stabilityScores.length
+                        );
+                    }
+                }
+                
                 return `
                     <div class="session-card" data-session-index="${index}">
                         <div class="session-content" onclick="viewLocalSession(${index})">
                             <div class="session-info">
-                                <div class="session-date">${formatSessionDate(session.timestamp)}</div>
+                                <div class="session-header" style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px;">
+                                    <div class="session-date">${formatSessionDate(session.timestamp)}</div>
+                                    <div class="training-mode-badge" style="padding: 4px 12px; background: ${modeInfo.color}20; border-radius: 12px; color: ${modeInfo.color}; font-size: 12px; font-weight: 600;">
+                                        ${modeInfo.name}
+                                    </div>
+                                </div>
                                 <div class="session-stats">
                                     <div class="session-stat">
                                         <div class="session-stat-value">${session.shots.length}</div>
                                         <div class="session-stat-label">${t('shots')}</div>
                                     </div>
-                                    <div class="session-stat">
-                                        <div class="session-stat-value">${Math.round(totalDuration)}</div>
-                                        <div class="session-stat-label">${t('totalTime')} (s)</div>
-                                    </div>
-                                    <div class="session-stat">
-                                        <div class="session-stat-value">${avgDuration.toFixed(2)}</div>
-                                        <div class="session-stat-label">${t('avgDuration')} (s)</div>
-                                    </div>
+                                    ${firstShot.professionalMode && avgStabilityScore !== null ? `
+                                        <div class="session-stat">
+                                            <div class="session-stat-value">${avgStabilityScore}</div>
+                                            <div class="session-stat-label">${t('stabilityScore')}</div>
+                                        </div>
+                                    ` : `
+                                        <div class="session-stat">
+                                            <div class="session-stat-value">${avgDuration.toFixed(2)}</div>
+                                            <div class="session-stat-label">${t('shotSpeed')} (s)</div>
+                                        </div>
+                                    `}
                                 </div>
                             </div>
                             <svg class="session-arrow" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
@@ -2939,6 +3245,32 @@ window.viewLocalSession = async function(sessionIndex) {
             hour12: true 
         });
         
+        // Check if this is a professional mode shot with stability metrics
+        const hasStabilityMetrics = shot.professionalMode === 'stability' && shot.shotData?.stabilityMetrics?.toe;
+        let stabilityInfo = null;
+        
+        if (hasStabilityMetrics) {
+            const percentage = shot.shotData.stabilityMetrics.toe.percentage;
+            const label = shot.shotData.stabilityMetrics.toe.label;
+            const color = shot.shotData.stabilityMetrics.toe.color;
+            
+            // Get stability level text (not percentage)
+            let levelText;
+            if (percentage <= 10) {
+                levelText = getCurrentLanguage() === 'zh' ? '优秀' : 'Excellent';
+            } else if (percentage <= 20) {
+                levelText = getCurrentLanguage() === 'zh' ? '良好' : 'Good';
+            } else if (percentage <= 30) {
+                levelText = getCurrentLanguage() === 'zh' ? '一般' : 'Average';
+            } else if (percentage <= 40) {
+                levelText = getCurrentLanguage() === 'zh' ? '需改进' : 'Needs Work';
+            } else {
+                levelText = getCurrentLanguage() === 'zh' ? '较差' : 'Poor';
+            }
+            
+            stabilityInfo = { levelText, color };
+        }
+        
         return `
         <div class="shot-card" data-shot-id="${shot.id}">
             <div class="shot-media">
@@ -2951,6 +3283,12 @@ window.viewLocalSession = async function(sessionIndex) {
                         <span class="shot-stat-label">${t('duration')}</span>
                         <span class="shot-stat-value">${shot.shotData?.duration?.toFixed(2) || 'N/A'}s</span>
                     </div>
+                    ${hasStabilityMetrics ? `
+                    <div class="shot-stat">
+                        <span class="shot-stat-label">${getCurrentLanguage() === 'zh' ? '稳定性' : 'Stability'}</span>
+                        <span class="shot-stat-value" style="color: ${stabilityInfo.color}; font-weight: 600;">${stabilityInfo.levelText}</span>
+                    </div>
+                    ` : ''}
                     <span class="shot-timestamp">${timestamp}</span>
                 </div>
                 <div class="shot-actions">
@@ -3425,20 +3763,58 @@ window.playLocalReplay = async function(shotId) {
             const dateStr = shotDate.toLocaleDateString();
             const timeStr = shotDate.toLocaleTimeString();
             
-            stats.innerHTML = `
-                <div style="display: flex; justify-content: center; align-items: stretch; text-align: center; padding: var(--space-lg); gap: var(--space-lg);">
-                    <div style="flex: 1; display: flex; flex-direction: column; align-items: center;">
-                        <div style="font-size: var(--font-base); font-weight: 600; color: var(--text-primary);">${dateStr}</div>
-                        <div style="font-size: var(--font-sm); color: var(--text-secondary); margin-top: 4px;">${timeStr}</div>
-                        <div style="color: var(--text-tertiary); margin-top: var(--space-xs); font-size: var(--font-xs); text-transform: uppercase; letter-spacing: 0.05em; white-space: nowrap;">${t('dateAndTime')}</div>
+            // Check if shot has stability metrics
+            const hasStabilityMetrics = shot.professionalMode && shot.shotData?.stabilityMetrics?.toe;
+            
+            if (hasStabilityMetrics) {
+                const percentage = shot.shotData.stabilityMetrics.toe.percentage;
+                const color = shot.shotData.stabilityMetrics.toe.color;
+                
+                // Get stability level text
+                let levelText;
+                if (percentage <= 10) {
+                    levelText = getCurrentLanguage() === 'zh' ? '优秀' : 'Excellent';
+                } else if (percentage <= 20) {
+                    levelText = getCurrentLanguage() === 'zh' ? '良好' : 'Good';
+                } else if (percentage <= 30) {
+                    levelText = getCurrentLanguage() === 'zh' ? '一般' : 'Average';
+                } else if (percentage <= 40) {
+                    levelText = getCurrentLanguage() === 'zh' ? '较差' : 'Poor';
+                } else {
+                    levelText = getCurrentLanguage() === 'zh' ? '很差' : 'Very Poor';
+                }
+                
+                // Professional mode: show shot speed and stability
+                stats.innerHTML = `
+                    <div style="display: flex; justify-content: center; align-items: stretch; text-align: center; padding: var(--space-lg); gap: var(--space-lg);">
+                        <div style="flex: 1; display: flex; flex-direction: column; align-items: center;">
+                            <div style="font-size: var(--font-xl); font-weight: 700; color: var(--accent-primary);">${((shot.shotData?.duration || 0)).toFixed(2)}s</div>
+                            <div style="color: var(--text-tertiary); margin-top: var(--space-xs); font-size: var(--font-xs); text-transform: uppercase; letter-spacing: 0.05em; white-space: nowrap;">${t('shotSpeed')}</div>
+                        </div>
+                        <div style="width: 1px; background: var(--bg-tertiary); align-self: stretch;"></div>
+                        <div style="flex: 1; display: flex; flex-direction: column; align-items: center;">
+                            <div style="font-size: var(--font-xl); font-weight: 700; color: ${color};">${levelText}</div>
+                            <div style="color: var(--text-tertiary); margin-top: var(--space-xs); font-size: var(--font-xs); text-transform: uppercase; letter-spacing: 0.05em; white-space: nowrap;">${getCurrentLanguage() === 'zh' ? '稳定性' : 'Stability'}</div>
+                        </div>
                     </div>
-                    <div style="width: 1px; background: var(--bg-tertiary); align-self: stretch;"></div>
-                    <div style="flex: 1; display: flex; flex-direction: column; align-items: center;">
-                        <div style="font-size: var(--font-xl); font-weight: 700; color: var(--accent-primary);">${Math.round((shot.shotData?.duration || 0) * 1000)}ms</div>
-                        <div style="color: var(--text-tertiary); margin-top: var(--space-xs); font-size: var(--font-xs); text-transform: uppercase; letter-spacing: 0.05em; white-space: nowrap;">${t('duration')}</div>
+                `;
+            } else {
+                // Regular mode: show date/time and shot speed
+                stats.innerHTML = `
+                    <div style="display: flex; justify-content: center; align-items: stretch; text-align: center; padding: var(--space-lg); gap: var(--space-lg);">
+                        <div style="flex: 1; display: flex; flex-direction: column; align-items: center;">
+                            <div style="font-size: var(--font-base); font-weight: 600; color: var(--text-primary);">${dateStr}</div>
+                            <div style="font-size: var(--font-sm); color: var(--text-secondary); margin-top: 4px;">${timeStr}</div>
+                            <div style="color: var(--text-tertiary); margin-top: var(--space-xs); font-size: var(--font-xs); text-transform: uppercase; letter-spacing: 0.05em; white-space: nowrap;">${t('dateAndTime')}</div>
+                        </div>
+                        <div style="width: 1px; background: var(--bg-tertiary); align-self: stretch;"></div>
+                        <div style="flex: 1; display: flex; flex-direction: column; align-items: center;">
+                            <div style="font-size: var(--font-xl); font-weight: 700; color: var(--accent-primary);">${((shot.shotData?.duration || 0)).toFixed(2)}s</div>
+                            <div style="color: var(--text-tertiary); margin-top: var(--space-xs); font-size: var(--font-xs); text-transform: uppercase; letter-spacing: 0.05em; white-space: nowrap;">${t('shotSpeed')}</div>
+                        </div>
                     </div>
-                </div>
-            `;
+                `;
+            }
             
             modal.classList.add('show');
             video.play();
@@ -3448,8 +3824,26 @@ window.playLocalReplay = async function(shotId) {
 // Add applyPreset function
 function applyPreset(presetType) {
     console.log('Applying preset:', presetType);
-    // For now, just log - functionality to be implemented when professional mode is developed
-    alert('Professional mode features are under development');
+    
+    if (presetType === 'stability') {
+        // Set professional mode state
+        state.trainingMode = 'professional';
+        state.professionalPreset = 'stability';
+        
+        // Navigate to training setup with professional mode
+        navigateTo('trainingSetup');
+        
+        // Pre-select free practice mode for stability training
+        setTimeout(() => {
+            selectTrainingMode('free');
+            document.getElementById('trainingStatus').textContent = 
+                getCurrentLanguage() === 'zh' ? 
+                '稳定性训练模式 - 追踪膝盖和脚趾位移' : 
+                'Stability Training - Tracking knee and toe displacement';
+        }, 100);
+    } else {
+        alert('Professional mode features are under development');
+    }
 }
 
 window.selectTrainingMode = selectTrainingMode;

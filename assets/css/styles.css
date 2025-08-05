@@ -2531,6 +2531,78 @@ h4 { font-size: var(--font-lg); }
     100% { background-position: -200% 0; }
 }
 
+/* Analyzing Spinner */
+.analyzing-indicator {
+    position: fixed;
+    top: 50%;
+    left: 50%;
+    transform: translate(-50%, -50%);
+    background: rgba(0, 0, 0, 0.8);
+    color: white;
+    padding: 20px 30px;
+    border-radius: 10px;
+    font-size: 18px;
+    z-index: 10000;
+    display: none;
+    align-items: center;
+    gap: 15px;
+}
+
+.analyzing-indicator.show {
+    display: flex;
+}
+
+.analyzing-spinner {
+    width: 30px;
+    height: 30px;
+    border: 3px solid rgba(255, 255, 255, 0.3);
+    border-top-color: white;
+    border-radius: 50%;
+    animation: spin 1s linear infinite;
+}
+
+@keyframes spin {
+    to { transform: rotate(360deg); }
+}
+
+/* Screen Flash Effects */
+.screen-flash {
+    position: fixed;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    pointer-events: none;
+    z-index: 9999;
+    animation: flash 0.5s ease-out;
+}
+
+.screen-flash.excellent {
+    background: rgba(0, 255, 0, 0.3);
+}
+
+.screen-flash.good {
+    background: rgba(0, 123, 255, 0.3);
+}
+
+.screen-flash.average {
+    background: rgba(255, 215, 0, 0.3);
+}
+
+.screen-flash.poor {
+    background: rgba(255, 99, 71, 0.3);
+}
+
+.screen-flash.very-poor {
+    background: rgba(255, 0, 0, 0.3);
+}
+
+@keyframes flash {
+    0% { opacity: 0; }
+    50% { opacity: 1; }
+    100% { opacity: 0; }
+}
+
 /* Responsive Design */
 @media (max-width: 375px) {
     :root {
@@ -2918,6 +2990,7 @@ button:disabled {
     transition: all var(--transition-base);
     position: relative;
     overflow: hidden;
+    min-height: 90px;
 }
 
 .training-mode-card:hover {
@@ -3035,6 +3108,34 @@ button:disabled {
     color: var(--text-secondary);
 }
 
+/* Frosted glass effect for disabled preset cards */
+.preset-card.disabled {
+    position: relative;
+    pointer-events: none;
+    opacity: 0.9;
+}
+
+.preset-card.disabled::after {
+    content: '';
+    position: absolute;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    background: rgba(255, 255, 255, 0.05);
+    backdrop-filter: blur(3px);
+    -webkit-backdrop-filter: blur(3px);
+    border-radius: var(--radius-md);
+}
+
+.preset-card.disabled .preset-icon {
+    opacity: 0.6;
+}
+
+.preset-card.disabled .preset-info {
+    opacity: 0.7;
+}
+
 .start-training-btn {
     width: 100%;
     padding: var(--space-lg);
@@ -3145,6 +3246,51 @@ button:disabled {
     padding: var(--space-lg);
     margin: var(--space-2xl) 0;
     text-align: center;
+}
+
+/* Stability training instructions */
+.stability-tips {
+    background: var(--bg-tertiary);
+    border-radius: var(--radius-lg);
+    padding: var(--space-lg);
+    margin-bottom: var(--space-lg);
+}
+
+.stability-tips h4 {
+    color: var(--text-primary);
+    font-size: var(--font-lg);
+    font-weight: 600;
+    margin-bottom: var(--space-md);
+}
+
+.tips-list {
+    list-style: none;
+    padding: 0;
+    margin: var(--space-md) 0;
+    text-align: left;
+}
+
+.tips-list li {
+    padding: var(--space-sm) 0;
+    color: var(--text-primary);
+    line-height: 1.6;
+    font-size: var(--font-base);
+}
+
+.stability-note {
+    margin-top: var(--space-md);
+    padding: var(--space-md);
+    background: rgba(139, 92, 246, 0.1);
+    border-radius: var(--radius-md);
+    border-left: 4px solid #8B5CF6;
+}
+
+.stability-note p {
+    margin: 0;
+    color: var(--text-secondary);
+    font-weight: 500;
+    font-size: var(--font-sm);
+    text-align: left;
 }
 
 .mode-reminder {
