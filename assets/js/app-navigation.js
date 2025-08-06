@@ -551,6 +551,13 @@ document.addEventListener('DOMContentLoaded', async () => {
     const user = await simpleAuth.getUser();
     if (user) {
         state.user = user;
+        
+        // Sync shooting hand preference from user data on app load
+        if (user.shooting_hand) {
+            state.shootingHand = user.shooting_hand;
+            console.log('Shooting hand synced on app load:', state.shootingHand);
+        }
+        
         // Navigate to home or last page if stored
         const lastPage = sessionStorage.getItem('shootingCoachLastPage') || 'home';
         // Don't restore training page on refresh - always go to home instead
@@ -945,6 +952,12 @@ async function handleAuth(e) {
             state.user = result.data;
             // User is saved in Supabase, no need for localStorage
             
+            // Sync shooting hand preference from user data
+            if (result.data.shooting_hand) {
+                state.shootingHand = result.data.shooting_hand;
+                console.log('Shooting hand synced from login:', state.shootingHand);
+            }
+            
             if (mode === 'signup') {
                 alert(getCurrentLanguage() === 'zh' ? `欢迎 ${name}！您是第${result.data.id}/1000位用户` : `Welcome ${name}! You are user #${result.data.id}/1000`);
             }
@@ -965,6 +978,12 @@ async function handleAuth(e) {
 
 // Show Home
 async function showHome() {
+    // Sync shooting hand preference from user data
+    if (state.user && state.user.shooting_hand) {
+        state.shootingHand = state.user.shooting_hand;
+        console.log('Shooting hand synced in showHome:', state.shootingHand);
+    }
+    
     navigateTo('home');
     await loadStats();
     await loadRecentShots();
@@ -1130,6 +1149,10 @@ async function startTraining() {
         alert(getCurrentLanguage() === 'zh' ? '请先登录再开始训练' : 'Please log in to start training');
         return;
     }
+    
+    // Log shooting hand preference at training start
+    console.log('Starting training with shooting hand:', state.shootingHand);
+    console.log('User shooting hand preference:', state.user.shooting_hand);
     
     navigateTo('training');
     state.isTraining = true;
@@ -2016,13 +2039,17 @@ function detectShot(landmarks) {
     
     const currentTime = Date.now();
     
-    // Debug logging disabled
-    
     // Get key points based on shooting hand preference
     const isLeftHanded = state.shootingHand === 'left';
     const wristIndex = isLeftHanded ? 15 : 16;  // Left wrist: 15, Right wrist: 16
     const indexFingerIndex = isLeftHanded ? 19 : 20;  // Left index: 19, Right index: 20
     const shoulderIndex = isLeftHanded ? 11 : 12;  // Left shoulder: 11, Right shoulder: 12
+    
+    // Log hand tracking info periodically
+    if (state.sessionShots === 0 && Date.now() % 5000 < 100) {
+        console.log('Shot detection using:', isLeftHanded ? 'LEFT hand' : 'RIGHT hand', 
+                    '- Wrist:', wristIndex, 'Finger:', indexFingerIndex, 'Shoulder:', shoulderIndex);
+    }
     
     const wrist = landmarks[wristIndex];
     const indexFinger = landmarks[indexFingerIndex];
@@ -2886,6 +2913,11 @@ async function showProfile() {
     
     // Update shooting hand selection
     const userHand = state.user.shooting_hand || state.user.user_metadata?.shooting_hand || 'right';
+    
+    // Update global state to match user preference
+    state.shootingHand = userHand;
+    console.log('Shooting hand synced in showProfile:', state.shootingHand);
+    
     document.querySelectorAll('.hand-btn').forEach(btn => {
         btn.classList.remove('active');
     });
